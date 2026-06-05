@@ -712,6 +712,7 @@ fun WorldMapScreen(viewModel: GameViewModel, state: PlayerState) {
 fun GameplayScreen(viewModel: GameViewModel, level: Int) {
     val board by viewModel.boardState.collectAsState()
     val obstacles by viewModel.obstacleState.collectAsState()
+    val explodingCandies by viewModel.explodingCandiesState.collectAsState()
     val moves by viewModel.movesLeft.collectAsState()
     val score by viewModel.currentScore.collectAsState()
     val goals by viewModel.goalsList.collectAsState()
@@ -896,6 +897,7 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                             GridComposablesBoard(
                                 board = board,
                                 obstacles = obstacles,
+                                explodingCandies = explodingCandies,
                                 selectedCell = selectedCell,
                                 onCellSelect = { r, c ->
                                     val sel = selectedCell
@@ -1061,6 +1063,7 @@ fun BossArenaPanel(
 fun GridComposablesBoard(
     board: Array<Array<CandyItem?>>,
     obstacles: Map<Pair<Int, Int>, ObstacleType>,
+    explodingCandies: List<ExplodingCandy>,
     selectedCell: Pair<Int, Int>?,
     onCellSelect: (Int, Int) -> Unit,
     onSwipe: (Int, Int, String) -> Unit
@@ -1116,6 +1119,15 @@ fun GridComposablesBoard(
                                 special = item.special,
                                 modifier = Modifier.fillMaxSize()
                             )
+                        } else {
+                            // Render explosion effect if cell is in active explodingCandies set
+                            val explodingCandy = explodingCandies.firstOrNull { it.r == r && it.c == c }
+                            if (explodingCandy != null) {
+                                CandyExplosionEffect(
+                                    type = explodingCandy.type,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
 
                         // Overlay Obstacle renders

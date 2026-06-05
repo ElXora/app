@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.*
@@ -796,4 +798,93 @@ private fun DrawScope.drawFishDetails(center: Offset, radius: Float) {
         radius = r * 0.08f,
         center = Offset(center.x - r * 0.44f, center.y - r * 0.12f)
     )
+}
+
+// Juicy physics-simulated particle explosion for a crushed candy, matching Candy Crush style
+@Composable
+fun CandyExplosionEffect(
+    type: CandyType,
+    modifier: Modifier = Modifier
+) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing)
+        )
+    }
+
+    val p = progress.value
+    val color = getCandyColor(type)
+
+    Canvas(modifier = modifier) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val maxRadius = size.minDimension / 2f
+
+        // 1. Expanding shockwave concentric rings
+        drawCircle(
+            color = color.copy(alpha = (1f - p) * 0.8f),
+            radius = maxRadius * (0.1f + p * 1.6f),
+            center = center,
+            style = Stroke(width = (4.dp.toPx() * (1f - p)))
+        )
+        
+        drawCircle(
+            color = Color.White.copy(alpha = (1f - p) * 0.4f),
+            radius = maxRadius * (0.05f + p * 1.2f),
+            center = center,
+            style = Stroke(width = (2.dp.toPx() * (1f - p)))
+        )
+
+        // 2. Flying candy Shards or Juice Drops (8 particles)
+        val numParticles = 8
+        for (i in 0 until numParticles) {
+            val angleDeg = i * (360f / numParticles) + (p * 50f)
+            val angleRad = Math.toRadians(angleDeg.toDouble())
+            val distance = maxRadius * (p * 1.9f)
+            val px = center.x + (cos(angleRad) * distance).toFloat()
+            val py = center.y + (sin(angleRad) * distance).toFloat()
+            
+            val pRadius = maxRadius * 0.25f * (1f - p)
+            
+            drawCircle(
+                color = color,
+                radius = pRadius,
+                center = Offset(px, py)
+            )
+            
+            // Bright white sheen on some particles
+            if (i % 2 == 0) {
+                drawCircle(
+                    color = Color.White.copy(alpha = (1f - p)),
+                    radius = pRadius * 0.4f,
+                    center = Offset(px - pRadius * 0.2f, py - pRadius * 0.2f)
+                )
+            }
+        }
+
+        // 3. Center flash and remaining imploding core
+        if (p < 0.6f) {
+            val coreScale = (1f - p / 0.6f)
+            drawCircle(
+                color = Color.White.copy(alpha = (1f - p) * 0.9f),
+                radius = maxRadius * 0.6f * coreScale,
+                center = center
+            )
+        }
+    }
+}
+
+fun getCandyColor(type: CandyType): Color {
+    return when (type) {
+        CandyType.PURPLE_BERRY -> Color(0xFFD81B60) // High quality candy color codes
+        CandyType.RED_JELLYBEAN -> Color(0xFFE53935)
+        CandyType.PINK_SWIRL -> Color(0xFFEC407A)
+        CandyType.YELLOW_STAR -> Color(0xFFFFEB3B)
+        CandyType.BLUE_GEM -> Color(0xFF1E88E5)
+        CandyType.CHOCO_BALL -> Color(0xFF5D4037)
+        CandyType.ORANGE_STRIPED -> Color(0xFFFB8C00)
+        CandyType.GREEN_CUBE -> Color(0xFF43A047)
+        CandyType.COLOR_BOMB -> Color(0xFFFFD54F)
+    }
 }

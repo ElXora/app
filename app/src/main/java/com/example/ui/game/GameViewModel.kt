@@ -29,6 +29,15 @@ data class FloatingText(
     val colorHex: String = "#FFFFFF"
 )
 
+// Juicy visual candy breaking animations
+data class ExplodingCandy(
+    val r: Int,
+    val c: Int,
+    val type: CandyType,
+    val special: CandySpecial,
+    val startTime: Long = System.currentTimeMillis()
+)
+
 // Main ViewModel
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class GameViewModel(application: Application) : AndroidViewModel(application) {
@@ -46,6 +55,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // Board State
     private val _boardState = MutableStateFlow<Array<Array<CandyItem?>>>(emptyArray())
     val boardState: StateFlow<Array<Array<CandyItem?>>> = _boardState.asStateFlow()
+    
+    private val _explodingCandies = MutableStateFlow<List<ExplodingCandy>>(emptyList())
+    val explodingCandiesState: StateFlow<List<ExplodingCandy>> = _explodingCandies.asStateFlow()
 
     private val _obstacleState = MutableStateFlow<Map<Pair<Int, Int>, ObstacleType>>(emptyMap())
     val obstacleState: StateFlow<Map<Pair<Int, Int>, ObstacleType>> = _obstacleState.asStateFlow()
@@ -260,10 +272,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Run splash timeout, then transition to our secure Login screen
+        // Run splash timeout, then transition to our secure Login screen or Home screen if stayed signed in
         viewModelScope.launch {
             delay(1800)
-            _currentScreen.value = GameScreen.Login
+            val sharedPrefs = application.getSharedPreferences("candy_kingdom_prefs", android.content.Context.MODE_PRIVATE)
+            val lastUser = sharedPrefs.getString("last_username", null)
+            if (!lastUser.isNullOrEmpty() && repository.userExists(lastUser)) {
+                activeUser.value = lastUser
+                _currentScreen.value = GameScreen.Home
+                SoundManager.playLevelStart()
+            } else {
+                _currentScreen.value = GameScreen.Login
+            }
         }
     }
 
@@ -542,9 +562,40 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         var cascadeLoopCount = 1
 
         while (true) {
+            val previousBoard = _boardState.value
             val result = engine.processMatchesAndCollapse()
             if (result.matchesFound.isNotEmpty() || result.clearedObstacles.isNotEmpty()) {
                 anyMatchesInSequence = true
+
+                // Save exploding cells for custom particles
+                val explodedList = result.matchesFound.mapNotNull { cell ->
+                    val candy = previousBoard.getOrNull(cell.first)?.getOrNull(cell.second)
+                    if (candy != null) {
+                        ExplodingCandy(r = cell.first, c = cell.second, type = candy.type, special = candy.special)
+                    } else null
+                }
+                _explodingCandies.value = explodedList
+
+                // Play real-time candy break sound effects
+                if (result.matchesFound.isNotEmpty()) {
+                    val createdSpecials = result.specialCreated.values
+                    val hasColorBomb = createdSpecials.any { it.first == CandyType.COLOR_BOMB }
+                    val hasWrapped = createdSpecials.any { it.second == CandySpecial.WRAPPED }
+                    val hasStriped = createdSpecials.any { it.second == CandySpecial.STRIPED_HORIZONTAL || it.second == CandySpecial.STRIPED_VERTICAL }
+                    
+                    when {
+                        hasColorBomb -> SoundManager.playMatch5Sparkle()
+                        hasWrapped -> SoundManager.playWrappedExplosion()
+                        hasStriped -> SoundManager.playMatch4Burst()
+                        else -> {
+                            if (cascadeLoopCount > 1) {
+                                SoundManager.playCombosPitchIncrease(cascadeLoopCount)
+                            } else {
+                                SoundManager.playMatch3Pop()
+                            }
+                        }
+                    }
+                }
 
                 // Scoring calculation
                 val comboMultiplier = if (cascadeLoopCount > 1) 1.5f else 1.0f
@@ -593,7 +644,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 _obstacleState.value = engine.obstacles.toMap()
                 
                 // Keep delay to play nice exploding visual feel
-                delay(320)
+                delay(380)
+
+                // Dismiss particles
+                _explodingCandies.value = emptyList()
 
                 // Refill collapse slide
                 engine.collapseBoard()
@@ -813,6 +867,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 avatarUri = picUri
             )
             repository.savePlayerState(newState)
+            // Save last signed in user to SharedPreferences
+            val sharedPrefs = getApplication<Application>().getSharedPreferences("candy_kingdom_prefs", android.content.Context.MODE_PRIVATE)
+            sharedPrefs.edit().putString("last_username", uName).apply()
+
             activeUser.value = uName
             onResult(true, "Successfully Registered, Welcome!")
             _currentScreen.value = GameScreen.Home
@@ -824,6 +882,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val state = repository.getPlayerStateDirect(uName)
             if (state.password == pWord) {
+                // Save last signed in user to SharedPreferences
+                val sharedPrefs = getApplication<Application>().getSharedPreferences("candy_kingdom_prefs", android.content.Context.MODE_PRIVATE)
+                sharedPrefs.edit().putString("last_username", uName).apply()
+
                 activeUser.value = uName
                 onResult(true, "Successfully Logged In!")
                 _currentScreen.value = GameScreen.Home
@@ -835,6 +897,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun logoutCurrentUser() {
+        // Clear last signed in user in SharedPreferences
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("candy_kingdom_prefs", android.content.Context.MODE_PRIVATE)
+        sharedPrefs.edit().remove("last_username").apply()
+
         activeUser.value = "Guest"
         _currentScreen.value = GameScreen.Login
         SoundManager.playDefeatMelody()
