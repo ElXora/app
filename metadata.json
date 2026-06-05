@@ -1,0 +1,6 @@
+{
+  "name": "Candy Kingdom Legends",
+  "description": "A magical match-3 puzzle adventure. Defeat candy bosses, explore sweet worlds, and rescue magical creatures!",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
