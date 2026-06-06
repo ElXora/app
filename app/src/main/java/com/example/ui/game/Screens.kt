@@ -22,10 +22,16 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -100,6 +106,7 @@ fun SplashScreen() {
             ),
         contentAlignment = Alignment.Center
     ) {
+        DecorativeBackgroundPattern()
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
@@ -191,6 +198,7 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
                 )
             )
     ) {
+        DecorativeBackgroundPattern()
         // Decorative background sparkles/castles
         Column(
             modifier = Modifier
@@ -584,6 +592,7 @@ fun WorldMapScreen(viewModel: GameViewModel, state: PlayerState) {
                 )
             )
     ) {
+        DecorativeBackgroundPattern()
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
             Row(
@@ -712,7 +721,9 @@ fun WorldMapScreen(viewModel: GameViewModel, state: PlayerState) {
 fun GameplayScreen(viewModel: GameViewModel, level: Int) {
     val board by viewModel.boardState.collectAsState()
     val obstacles by viewModel.obstacleState.collectAsState()
+    val obstacleDurability by viewModel.obstacleDurabilityState.collectAsState()
     val explodingCandies by viewModel.explodingCandiesState.collectAsState()
+    val obstacleAnimations by viewModel.obstacleAnimationsState.collectAsState()
     val moves by viewModel.movesLeft.collectAsState()
     val score by viewModel.currentScore.collectAsState()
     val goals by viewModel.goalsList.collectAsState()
@@ -747,6 +758,7 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                 )
             )
     ) {
+        DecorativeBackgroundPattern()
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -864,8 +876,17 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                 contentAlignment = Alignment.Center
             ) {
                 // Background board decorative grid frame
+                val darkness by viewModel.boardDarkness.collectAsState()
+                val flashActive by viewModel.boardFlash.collectAsState()
+                val shakeOffset by viewModel.screenShakeOffset.collectAsState()
+                val spinList by viewModel.flyingSpinners.collectAsState()
+                val arcList by viewModel.lightningArcs.collectAsState()
+                val partList by viewModel.boardParticles.collectAsState()
+
                 Card(
-                    modifier = Modifier.aspectRatio(1f),
+                    modifier = Modifier
+                        .aspectRatio(1f)
+                        .offset(x = shakeOffset.first.dp, y = shakeOffset.second.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
                     border = BorderStroke(3.dp, Color.White.copy(alpha = 0.15f))
@@ -897,6 +918,7 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                             GridComposablesBoard(
                                 board = board,
                                 obstacles = obstacles,
+                                obstacleDurability = obstacleDurability,
                                 explodingCandies = explodingCandies,
                                 selectedCell = selectedCell,
                                 onCellSelect = { r, c ->
@@ -923,8 +945,177 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                                     if (targetR in 0..7 && targetC in 0..7) {
                                         viewModel.performSwipeAction(r, c, targetR, targetC)
                                     }
-                                }
+                                },
+                                obstacleAnimations = obstacleAnimations
                             )
+                        }
+
+                        // Overlay Darkness & Flash Effect
+                        if (darkness > 0f) {
+                            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = darkness)))
+                        }
+                        if (flashActive) {
+                            Box(modifier = Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.9f)))
+                        }
+
+                        // Drawing Custom Animations and Particles on a top canvas layer
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val w = size.width / 8f
+                            val h = size.height / 8f
+
+                            // Draw Neon Lightning Electric Arcs
+                            arcList.forEach { arc ->
+                                val fromX = arc.fromC * w + w / 2f
+                                val fromY = arc.fromR * h + h / 2f
+                                val toX = arc.toC * w + w / 2f
+                                val toY = arc.toR * h + h / 2f
+                                
+                                val path = Path().apply {
+                                    moveTo(fromX, fromY)
+                                    val segments = 4
+                                    for (i in 1 until segments) {
+                                        val faction = i.toFloat() / segments
+                                        val midX = fromX + (toX - fromX) * faction
+                                        val midY = fromY + (toY - fromY) * faction
+                                        // Random orthogonal offset
+                                        val dx = ((Math.random() - 0.5f) * 18f).toFloat()
+                                        val dy = ((Math.random() - 0.5f) * 18f).toFloat()
+                                        lineTo(midX + dx, midY + dy)
+                                    }
+                                    lineTo(toX, toY)
+                                }
+                                
+                                // Glowing background blur line
+                                drawPath(
+                                    path = path,
+                                    color = arc.color.copy(alpha = 0.4f * arc.alpha),
+                                    style = Stroke(width = 6.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                )
+                                // Main bright foreground core line
+                                drawPath(
+                                    path = path,
+                                    color = Color.White.copy(alpha = arc.alpha),
+                                    style = Stroke(width = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                )
+                            }
+
+                            // Draw Particles (Circular Chips & Glowing Flames/Smokes)
+                            partList.forEach { p ->
+                                val px = p.c * w + w / 2f
+                                val py = p.r * h + h / 2f
+                                
+                                when (p.shape) {
+                                    ParticleShape.CHIP -> {
+                                        // Dynamic fragments with beautiful shadow
+                                        drawCircle(
+                                            color = Color.Black.copy(alpha = p.alpha * 0.4f),
+                                            radius = p.size,
+                                            center = Offset(px + 2f, py + 3f)
+                                        )
+                                        drawCircle(
+                                            color = p.color.copy(alpha = p.alpha),
+                                            radius = p.size,
+                                            center = Offset(px, py)
+                                        )
+                                        drawCircle(
+                                            color = Color.White.copy(alpha = p.alpha * 0.7f),
+                                            radius = p.size * 0.4f,
+                                            center = Offset(px - p.size * 0.3f, py - p.size * 0.3f)
+                                        )
+                                    }
+                                    ParticleShape.FLAME -> {
+                                        // Thermal core
+                                        drawCircle(
+                                            brush = Brush.radialGradient(
+                                                colors = listOf(Color.White, p.color, Color.Transparent),
+                                                center = Offset(px, py),
+                                                radius = p.size * 1.5f
+                                            ),
+                                            radius = p.size * 1.5f,
+                                            center = Offset(px, py)
+                                        )
+                                    }
+                                    ParticleShape.SMOKE -> {
+                                        drawCircle(
+                                            color = p.color.copy(alpha = p.alpha * 0.45f),
+                                            radius = p.size,
+                                            center = Offset(px, py)
+                                        )
+                                    }
+                                    else -> {
+                                        // Sparkles/Confetti
+                                        val sizeVal = p.size
+                                        val crossPath = Path().apply {
+                                            moveTo(px - sizeVal, py)
+                                            lineTo(px + sizeVal, py)
+                                            moveTo(px, py - sizeVal)
+                                            lineTo(px, py + sizeVal)
+                                        }
+                                        drawPath(
+                                            path = crossPath,
+                                            color = p.color.copy(alpha = p.alpha),
+                                            style = Stroke(width = 2.dp.toPx())
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Draw Procedural Flying Propeller Spinners
+                            spinList.forEach { spin ->
+                                val sx = (spin.fromC + (spin.toC - spin.fromC) * spin.progress) * w + w / 2f
+                                val sy = (spin.fromR + (spin.toR - spin.fromR) * spin.progress) * h + h / 2f
+                                
+                                val radiusScale = 22.dp.toPx()
+                                val spinRot = spin.rotation
+                                
+                                // Aerodynamic triple dynamic wings
+                                rotate(spinRot, Offset(sx, sy)) {
+                                    for (i in 0 until 3) {
+                                        val angle = i * 120f
+                                        val rad = Math.toRadians(angle.toDouble())
+                                        val wl = radiusScale * 0.9f
+                                        val ww = radiusScale * 0.35f
+                                        
+                                        val wp = Path().apply {
+                                            moveTo(sx, sy)
+                                            val lx = sx + (cos(rad) * wl * 0.4f).toFloat() - (sin(rad) * ww * 0.5f).toFloat()
+                                            val ly = sy + (sin(rad) * wl * 0.4f).toFloat() + (cos(rad) * ww * 0.5f).toFloat()
+                                            val tx = sx + (cos(rad) * wl).toFloat()
+                                            val ty = sy + (sin(rad) * wl).toFloat()
+                                            val rx = sx + (cos(rad) * wl * 0.7f).toFloat() + (sin(rad) * ww * 0.3f).toFloat()
+                                            val ry = sy + (sin(rad) * wl * 0.7f).toFloat() - (cos(rad) * ww * 0.3f).toFloat()
+                                            
+                                            lineTo(lx, ly)
+                                            quadraticTo(tx - (sin(rad)*5f).toFloat(), ty + (cos(rad)*5f).toFloat(), tx, ty)
+                                            quadraticTo(rx, ry, sx, sy)
+                                            close()
+                                        }
+                                        
+                                        val colBrush = when (i) {
+                                            0 -> Brush.linearGradient(listOf(Color(0xFF00E5FF), Color(0xFF2979FF)))
+                                            1 -> Brush.linearGradient(listOf(Color(0xFFFFEA00), Color(0xFFFF9100)))
+                                            else -> Brush.linearGradient(listOf(Color(0xFFE040FB), Color(0xFF9013FE)))
+                                        }
+                                        drawPath(wp, colBrush)
+                                    }
+                                }
+                                
+                                // Golden center cap
+                                drawCircle(
+                                    color = Color.Black.copy(alpha = 0.3f),
+                                    radius = radiusScale * 0.28f,
+                                    center = Offset(sx + 1f, sy + 2f)
+                                )
+                                drawCircle(
+                                    brush = Brush.radialGradient(
+                                        colors = listOf(Color(0xFFFFD54F), Color(0xFFF57F17)),
+                                        center = Offset(sx, sy),
+                                        radius = radiusScale * 0.25f
+                                    ),
+                                    radius = radiusScale * 0.25f,
+                                    center = Offset(sx, sy)
+                                )
+                            }
                         }
 
                         // Dynamic Floating scoring/damage combat numbers overlaid on top!
@@ -982,11 +1173,97 @@ fun drawBlockerShapeMini(type: ObstacleType) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val r = size.minDimension / 2f
         val center = Offset(size.width / 2f, size.height / 2f)
+        val w = size.width
+        val h = size.height
+        
         when (type) {
-            ObstacleType.CRATE -> drawRect(Color(0xFF8D6E63), size = size)
-            ObstacleType.ICE -> drawCircle(Color(0xFF80DEEA), radius = r, center = center)
-            ObstacleType.CHAIN -> drawCircle(Color.Gray, radius = r * 0.8f, center = center, style = Stroke(4f))
-            ObstacleType.CHOCOLATE -> drawRect(Color(0xFF3E2723), size = size)
+            ObstacleType.CRATE -> {
+                drawRect(Color(0xFF8D6E63), size = size)
+                drawRect(Color(0xFF4E342E), size = size, style = Stroke(1.5.dp.toPx()))
+                drawLine(Color(0xFF4E342E), Offset(0f, 0f), Offset(w, h), strokeWidth = 1.5.dp.toPx())
+                drawLine(Color(0xFF4E342E), Offset(w, 0f), Offset(0f, h), strokeWidth = 1.5.dp.toPx())
+            }
+            ObstacleType.STONE -> {
+                drawRect(Color(0xFF546E7A), size = size)
+                drawRect(Color(0xFF263238), size = size, style = Stroke(1.5.dp.toPx()))
+                drawLine(Color(0xFF263238), Offset(w * 0.2f, h * 0.3f), Offset(w * 0.8f, h * 0.7f), strokeWidth = 1.dp.toPx())
+            }
+            ObstacleType.ICE -> {
+                drawCircle(Color(0xFF80DEEA), radius = r * 0.95f, center = center)
+                drawCircle(Color.White, radius = r * 0.95f, center = center, style = Stroke(1.5.dp.toPx()))
+            }
+            ObstacleType.CHAIN -> {
+                drawCircle(Color(0xFFB0BEC5), radius = r * 0.72f, center = center, style = Stroke(3.dp.toPx()))
+                drawLine(Color(0xFF37474F), Offset(0f, 0f), Offset(w, h), strokeWidth = 2.dp.toPx())
+                drawLine(Color(0xFF37474F), Offset(w, 0f), Offset(0f, h), strokeWidth = 2.dp.toPx())
+            }
+            ObstacleType.MAGIC_BARRIER -> {
+                drawCircle(Color(0xFFE040FB), radius = r * 0.9f, center = center, style = Stroke(2.5.dp.toPx()))
+                drawCircle(Color(0xFF4A148C).copy(alpha = 0.6f), radius = r * 0.75f, center = center)
+            }
+            ObstacleType.CHOCOLATE -> {
+                drawCircle(Color(0xFF3E2723), radius = r * 0.85f, center = center)
+            }
+            ObstacleType.APPLE -> {
+                drawCircle(Color(0xFFD50000), radius = r * 0.82f, center = center)
+                drawCircle(Color(0xFF4CAF50), radius = r * 0.22f, center = Offset(center.x + r * 0.35f, center.y - r * 0.65f))
+            }
+            ObstacleType.CROWN -> {
+                val cPath = Path().apply {
+                    moveTo(center.x - r * 0.8f, center.y + r * 0.5f)
+                    lineTo(center.x + r * 0.8f, center.y + r * 0.5f)
+                    lineTo(center.x + r * 0.9f, center.y - r * 0.2f)
+                    lineTo(center.x + r * 0.4f, center.y + r * 0.15f)
+                    lineTo(center.x, center.y - r * 0.62f)
+                    lineTo(center.x - r * 0.4f, center.y + r * 0.15f)
+                    lineTo(center.x - r * 0.9f, center.y - r * 0.2f)
+                    close()
+                }
+                drawPath(cPath, Color(0xFFFFD54F))
+                drawPath(cPath, Color(0xFFE65100), style = Stroke(1.dp.toPx()))
+            }
+            ObstacleType.SHIELD -> {
+                val sPath = Path().apply {
+                    moveTo(center.x - r * 0.75f, center.y - r * 0.6f)
+                    quadraticTo(center.x, center.y - r * 0.65f, center.x + r * 0.75f, center.y - r * 0.6f)
+                    lineTo(center.x + r * 0.75f, center.y + r * 0.1f)
+                    quadraticTo(center.x, center.y + r * 0.95f, center.x, center.y + r * 0.95f)
+                    quadraticTo(center.x, center.y + r * 0.95f, center.x - r * 0.75f, center.y + r * 0.1f)
+                    close()
+                }
+                drawPath(sPath, Color(0xFF0288D1))
+                drawPath(sPath, Color(0xFFECEFF1), style = Stroke(1.5.dp.toPx()))
+            }
+            ObstacleType.CRYSTAL -> {
+                val cryPath = Path().apply {
+                    moveTo(center.x, center.y - r * 0.9f)
+                    lineTo(center.x + r * 0.7f, center.y)
+                    lineTo(center.x, center.y + r * 0.9f)
+                    lineTo(center.x - r * 0.7f, center.y)
+                    close()
+                }
+                drawPath(cryPath, Color(0xFF00E5FF))
+                drawPath(cryPath, Color.White, style = Stroke(1.5.dp.toPx()))
+            }
+            ObstacleType.EGGS -> {
+                val rBound = Rect(center.x - r * 0.55f, center.y - r * 0.8f, center.x + r * 0.55f, center.y + r * 0.75f)
+                val eggPath = Path().apply { addOval(rBound) }
+                drawPath(eggPath, Color(0xFFFFFDE7))
+                drawPath(eggPath, Color(0xFF8D6E63), style = Stroke(1.dp.toPx()))
+                drawCircle(Color(0xFF81C784), radius = r * 0.15f, center = Offset(center.x - r * 0.1f, center.y))
+            }
+            ObstacleType.BEE_HIVE -> {
+                val yStep = r * 0.45f
+                for (i in 0..2) {
+                    val scaleX = 1f - (i * 0.22f)
+                    drawRoundRect(
+                        color = Color(0xFFFFB300),
+                        topLeft = Offset(center.x - r * scaleX, center.y - r * 0.7f + i * yStep),
+                        size = Size(r * 2 * scaleX, r * 0.42f),
+                        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                    )
+                }
+            }
             else -> {}
         }
     }
@@ -1063,10 +1340,12 @@ fun BossArenaPanel(
 fun GridComposablesBoard(
     board: Array<Array<CandyItem?>>,
     obstacles: Map<Pair<Int, Int>, ObstacleType>,
+    obstacleDurability: Map<Pair<Int, Int>, Int>,
     explodingCandies: List<ExplodingCandy>,
     selectedCell: Pair<Int, Int>?,
     onCellSelect: (Int, Int) -> Unit,
-    onSwipe: (Int, Int, String) -> Unit
+    onSwipe: (Int, Int, String) -> Unit,
+    obstacleAnimations: List<ObstacleAnimationEvent> = emptyList()
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         for (r in 0 until 8) {
@@ -1078,7 +1357,9 @@ fun GridComposablesBoard(
                 for (c in 0 until 8) {
                     val item = board[r][c]
                     val isSelected = selectedCell?.first == r && selectedCell?.second == c
-                    val obstacle = obstacles[Pair(r, c)] ?: ObstacleType.NONE
+                    val cellKey = Pair(r, c)
+                    val obstacle = obstacles[cellKey] ?: ObstacleType.NONE
+                    val durability = obstacleDurability[cellKey] ?: 1
 
                     Box(
                         modifier = Modifier
@@ -1132,7 +1413,17 @@ fun GridComposablesBoard(
 
                         // Overlay Obstacle renders
                         if (obstacle != ObstacleType.NONE) {
-                            RenderObstacleGraphic(obstacle)
+                            RenderObstacleGraphic(obstacle, durability)
+                        }
+
+                        // Overlay active obstacle hit/break animations if current cell matches!
+                        val cellAnims = obstacleAnimations.filter { it.r == r && it.c == c }
+                        for (anim in cellAnims) {
+                            ObstacleExplosionEffect(
+                                type = anim.type,
+                                isDestroy = anim.isDestroy,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     }
                 }
@@ -1143,73 +1434,453 @@ fun GridComposablesBoard(
 
 // Draws obstacles overlays
 @Composable
-fun RenderObstacleGraphic(type: ObstacleType) {
+fun RenderObstacleGraphic(type: ObstacleType, durability: Int = 1) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val r = size.minDimension / 2f
         val center = Offset(size.width / 2f, size.height / 2f)
+        val w = size.width
+        val h = size.height
+        
         when (type) {
             ObstacleType.CRATE -> {
-                // Breakable woody wooden crates
-                drawRect(
-                    color = Color(0xFFA1887F),
-                    size = size
-                )
-                drawRect(
-                    color = Color(0xFF5D4037),
-                    size = size,
-                    style = Stroke(3.dp.toPx())
-                )
-                // Draw diagonal brace
-                drawLine(
-                    color = Color(0xFF5D4037),
-                    start = Offset(0f, 0f),
-                    end = Offset(size.width, size.height),
-                    strokeWidth = 2.dp.toPx()
-                )
+                // Brown wooden box background
+                drawRect(Color(0xFF8D6E63), size = size)
+                
+                // Border frame
+                drawRect(Color(0xFF4E342E), size = size, style = Stroke(3.dp.toPx()))
+                
+                // Metal brackets on corners!
+                val bSize = size.minDimension * 0.25f
+                // Top-Left
+                drawRect(Color(0xFF78909C), topLeft = Offset(0f, 0f), size = Size(bSize, bSize))
+                drawRect(Color(0xFF37474F), topLeft = Offset(0f, 0f), size = Size(bSize, bSize), style = Stroke(1.dp.toPx()))
+                // Top-Right
+                drawRect(Color(0xFF78909C), topLeft = Offset(w - bSize, 0f), size = Size(bSize, bSize))
+                drawRect(Color(0xFF37474F), topLeft = Offset(w - bSize, 0f), size = Size(bSize, bSize), style = Stroke(1.dp.toPx()))
+                // Bottom-Left
+                drawRect(Color(0xFF78909C), topLeft = Offset(0f, h - bSize), size = Size(bSize, bSize))
+                drawRect(Color(0xFF37474F), topLeft = Offset(0f, h - bSize), size = Size(bSize, bSize), style = Stroke(1.dp.toPx()))
+                // Bottom-Right
+                drawRect(Color(0xFF78909C), topLeft = Offset(w - bSize, h - bSize), size = Size(bSize, bSize))
+                drawRect(Color(0xFF37474F), topLeft = Offset(w - bSize, h - bSize), size = Size(bSize, bSize), style = Stroke(1.dp.toPx()))
+
+                // Wood grain brace (X brace)
+                drawLine(Color(0xFF4E342E), Offset(0f, 0f), Offset(w, h), strokeWidth = 3.dp.toPx())
+                if (durability >= 2) {
+                    drawLine(Color(0xFF4E342E), Offset(w, 0f), Offset(0f, h), strokeWidth = 3.dp.toPx())
+                }
+                
+                // Cracks depending on durability (starts with 3 durability. 2 shows small cracks, 1 shows increased crack texture)
+                if (durability == 2) {
+                    drawLine(Color(0xFF3E2723), Offset(w * 0.2f, h * 0.3f), Offset(w * 0.5f, h * 0.45f), strokeWidth = 2.dp.toPx())
+                    drawLine(Color(0xFF3E2723), Offset(w * 0.5f, h * 0.45f), Offset(w * 0.4f, h * 0.7f), strokeWidth = 2.dp.toPx())
+                }
+                if (durability == 1) {
+                    drawLine(Color(0xFF3E2723), Offset(w * 0.2f, h * 0.3f), Offset(w * 0.5f, h * 0.45f), strokeWidth = 2.5.dp.toPx())
+                    drawLine(Color(0xFF3E2723), Offset(w * 0.5f, h * 0.45f), Offset(w * 0.4f, h * 0.7f), strokeWidth = 2.5.dp.toPx())
+                    drawLine(Color(0xFF3E2723), Offset(w * 0.7f, h * 0.2f), Offset(w * 0.8f, h * 0.6f), strokeWidth = 2.dp.toPx())
+                    drawLine(Color(0xFF3E2723), Offset(w * 0.15f, h * 0.8f), Offset(w * 0.5f, h * 0.85f), strokeWidth = 1.5.dp.toPx())
+                }
+
+                // OVERLAY CHAINS ON DURABILITY 3!
+                if (durability == 3) {
+                    drawCircle(Color(0xB3ECEFF1), radius = r * 0.62f, center = center, style = Stroke(4.5.dp.toPx()))
+                    drawCircle(Color(0xFF37474F), radius = r * 0.62f, center = center, style = Stroke(1.5.dp.toPx()))
+                    
+                    drawLine(Color(0xB3ECEFF1), Offset(0f, 0f), Offset(w, h), strokeWidth = 4.5.dp.toPx())
+                    drawLine(Color(0xFF37474F), Offset(0f, 0f), Offset(w, h), strokeWidth = 1.5.dp.toPx())
+                    
+                    drawLine(Color(0xB3ECEFF1), Offset(w, 0f), Offset(0f, h), strokeWidth = 4.5.dp.toPx())
+                    drawLine(Color(0xFF37474F), Offset(w, 0f), Offset(0f, h), strokeWidth = 1.5.dp.toPx())
+                }
             }
-            ObstacleType.ICE -> {
-                // Shiny freezing frost crystals
+            ObstacleType.STONE -> {
+                // Gray heavy rock
                 drawRect(
                     brush = Brush.radialGradient(
-                        colors = listOf(Color(0xE6E0F7FA), Color(0x994DD0E1)),
+                        colors = listOf(Color(0xFFB0BEC5), Color(0xFF546E7A)),
+                        center = center,
+                        radius = r * 1.5f
+                    ),
+                    size = size
+                )
+                // Stone outer blocks frame
+                drawRect(Color(0xFF37474F), size = size, style = Stroke(3.dp.toPx()))
+                
+                // Solid cracks lines based on durability
+                if (durability <= 2) {
+                    drawLine(Color(0xFF263238), Offset(w * 0.1f, h * 0.5f), Offset(w * 0.4f, h * 0.35f), strokeWidth = 2.dp.toPx())
+                    drawLine(Color(0xFF263238), Offset(w * 0.4f, h * 0.35f), Offset(w * 0.9f, h * 0.6f), strokeWidth = 2.5.dp.toPx())
+                }
+                if (durability == 1) {
+                    drawLine(Color(0xFF263238), Offset(w * 0.5f, h * 0.1f), Offset(w * 0.3f, h * 0.8f), strokeWidth = 2.dp.toPx())
+                }
+            }
+            ObstacleType.ICE -> {
+                // Shiny freezing frost crystals translucent cover
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xE6E0F7FA), Color(0xAA4DD0E1)),
                         center = center,
                         radius = size.width * 0.7f
                     ),
                     size = size
                 )
-                drawRect(
-                    color = Color.White,
-                    size = size,
-                    style = Stroke(2.dp.toPx())
-                )
+                drawRect(Color.White.copy(alpha = 0.8f), size = size, style = Stroke(2.5.dp.toPx()))
+                
+                // Shine line
+                drawLine(Color.White.copy(alpha = 0.6f), Offset(w * 0.15f, h * 0.15f), Offset(w * 0.7f, h * 0.7f), strokeWidth = 4.dp.toPx())
+                
+                if (durability == 1) {
+                    // Ice spiderweb cracks
+                    drawLine(Color.White, Offset(w * 0.3f, h * 0.3f), Offset(w * 0.5f, h * 0.5f), strokeWidth = 1.5.dp.toPx())
+                    drawLine(Color.White, Offset(w * 0.5f, h * 0.5f), Offset(w * 0.7f, h * 0.4f), strokeWidth = 1.5.dp.toPx())
+                    drawLine(Color.White, Offset(w * 0.5f, h * 0.5f), Offset(w * 0.4f, h * 0.8f), strokeWidth = 1.5.dp.toPx())
+                }
             }
             ObstacleType.CHAIN -> {
-                // Steel chains matching overlay
+                // Crossing metal chains
+                drawCircle(Color(0xB3ECEFF1), radius = r * 0.62f, center = center, style = Stroke(4.5.dp.toPx()))
+                drawCircle(Color(0xFF37474F), radius = r * 0.62f, center = center, style = Stroke(1.5.dp.toPx()))
+                
+                drawLine(Color(0xB3ECEFF1), Offset(0f, 0f), Offset(w, h), strokeWidth = 4.5.dp.toPx())
+                drawLine(Color(0xFF37474F), Offset(0f, 0f), Offset(w, h), strokeWidth = 1.5.dp.toPx())
+                
+                drawLine(Color(0xB3ECEFF1), Offset(w, 0f), Offset(0f, h), strokeWidth = 4.5.dp.toPx())
+                drawLine(Color(0xFF37474F), Offset(w, 0f), Offset(0f, h), strokeWidth = 1.5.dp.toPx())
+            }
+            ObstacleType.MAGIC_BARRIER -> {
+                // Purple rune pulse barrier
+                drawCircle(Color(0xFF4A148C).copy(alpha = 0.5f), radius = r * 0.95f, center = center)
                 drawCircle(
-                    color = Color(0xB3B0BEC5),
-                    radius = r * 0.7f,
-                    style = Stroke(4.dp.toPx()),
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xE1E040FB), Color(0xAA4A148C)),
+                        center = center,
+                        radius = r * 0.9f
+                    ),
+                    radius = r * 0.85f,
                     center = center
                 )
-                drawCircle(
-                    color = Color.Black,
-                    radius = r * 0.7f,
-                    style = Stroke(1.dp.toPx()),
-                    center = center
-                )
+                drawCircle(Color(0xFFE040FB), radius = r * 0.88f, center = center, style = Stroke(2.5.dp.toPx()))
+                
+                // Draw inner magic cross rune star
+                drawLine(Color(0xFFE040FB).copy(alpha = 0.7f), Offset(center.x - r * 0.5f, center.y), Offset(center.x + r * 0.5f, center.y), strokeWidth = 2.dp.toPx())
+                drawLine(Color(0xFFE040FB).copy(alpha = 0.7f), Offset(center.x, center.y - r * 0.5f), Offset(center.x, center.y + r * 0.5f), strokeWidth = 2.dp.toPx())
             }
             ObstacleType.CHOCOLATE -> {
-                // Sticky dark brown slime spread
+                // Liquid brown cocoa sludge
                 drawRect(
                     brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF6D4C41), Color(0xFF3E2723)),
+                        colors = listOf(Color(0xFF8D6E63), Color(0xFF3E2723)),
                         center = center,
-                        radius = size.width * 0.8f
+                        radius = r * 1.3f
                     ),
                     size = size
                 )
+                // Outer gooey drips outline
+                drawCircle(Color(0xFF3E2723), radius = r * 0.78f, center = Offset(center.x - 4f, center.y - 4f))
+            }
+            ObstacleType.APPLE -> {
+                // Red Apple with stem and glossy highlights
+                drawCircle(Color(0xFFD50000), radius = r * 0.75f, center = center)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFFFF8A80), Color(0xFFD50000)),
+                        center = Offset(center.x - r * 0.15f, center.y - r * 0.15f),
+                        radius = r * 0.6f
+                    ),
+                    radius = r * 0.7f,
+                    center = center
+                )
+                // Brown Stem
+                drawLine(Color(0xFF5D4037), Offset(center.x, center.y - r * 0.7f), Offset(center.x + r * 0.25f, center.y - r * 1.05f), strokeWidth = 3.dp.toPx())
+                // Leaf
+                val leafPath = Path().apply {
+                    moveTo(center.x + r * 0.1f, center.y - r * 0.85f)
+                    quadraticTo(center.x + r * 0.6f, center.y - r * 1.0f, center.x + r * 0.45f, center.y - r * 0.65f)
+                    close()
+                }
+                drawPath(leafPath, Color(0xFF4CAF50))
+            }
+            ObstacleType.CROWN -> {
+                // Regallian Gold Crown
+                val cPath = Path().apply {
+                    moveTo(center.x - r * 0.7f, center.y + r * 0.6f)
+                    lineTo(center.x + r * 0.7f, center.y + r * 0.6f)
+                    lineTo(center.x + r * 0.85f, center.y - r * 0.2f)
+                    lineTo(center.x + r * 0.45f, center.y + r * 0.15f)
+                    lineTo(center.x, center.y - r * 0.7f)
+                    lineTo(center.x - r * 0.45f, center.y + r * 0.15f)
+                    lineTo(center.x - r * 0.85f, center.y - r * 0.2f)
+                    close()
+                }
+                drawPath(
+                    cPath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color(0xFFFFEA00), Color(0xFFFF9100))
+                    )
+                )
+                drawPath(cPath, Color(0xFFE65100), style = Stroke(2.dp.toPx()))
+                // Tip pearls
+                drawCircle(Color.White, radius = r * 0.12f, center = Offset(center.x, center.y - r * 0.7f))
+                drawCircle(Color.White, radius = r * 0.1f, center = Offset(center.x - r * 0.85f, center.y - r * 0.2f))
+                drawCircle(Color.White, radius = r * 0.1f, center = Offset(center.x + r * 0.85f, center.y - r * 0.2f))
+
+                // Rubies
+                drawCircle(Color.Red, radius = r * 0.08f, center = Offset(center.x, center.y + r * 0.35f))
+            }
+            ObstacleType.SHIELD -> {
+                // Guardian Blue Shield
+                val sPath = Path().apply {
+                    moveTo(center.x - r * 0.7f, center.y - r * 0.6f)
+                    quadraticTo(center.x, center.y - r * 0.65f, center.x + r * 0.7f, center.y - r * 0.6f)
+                    lineTo(center.x + r * 0.7f, center.y + r * 0.1f)
+                    quadraticTo(center.x + r * 0.6f, center.y + r * 0.75f, center.x, center.y + r * 0.95f)
+                    quadraticTo(center.x - r * 0.6f, center.y + r * 0.75f, center.x - r * 0.7f, center.y + r * 0.1f)
+                    close()
+                }
+                drawPath(
+                    sPath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color(0xFF29B6F6), Color(0xFF0288D1))
+                    )
+                )
+                drawPath(sPath, Color(0xFFECEFF1), style = Stroke(2.5.dp.toPx()))
+                
+                // Silver Lining
+                drawLine(Color(0xFFECEFF1), Offset(center.x, center.y - r * 0.6f), Offset(center.x, center.y + r * 0.95f), strokeWidth = 2.dp.toPx())
+            }
+            ObstacleType.CRYSTAL -> {
+                // Sparkling Cyan Crystal
+                val cryPath = Path().apply {
+                    moveTo(center.x, center.y - r * 0.8f)
+                    lineTo(center.x + r * 0.65f, center.y - r * 0.2f)
+                    lineTo(center.x + r * 0.45f, center.y + r * 0.75f)
+                    lineTo(center.x - r * 0.45f, center.y + r * 0.75f)
+                    lineTo(center.x - r * 0.65f, center.y - r * 0.2f)
+                    close()
+                }
+                drawPath(
+                    cryPath,
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFFE0F7FA), Color(0xFF00E5FF)),
+                        center = center,
+                        radius = r * 0.9f
+                    )
+                )
+                drawPath(cryPath, Color.White, style = Stroke(2.dp.toPx()))
+                // Facet highlights lines
+                drawLine(Color.White.copy(alpha = 0.6f), center, Offset(center.x, center.y - r * 0.8f), strokeWidth = 1.dp.toPx())
+                drawLine(Color.White.copy(alpha = 0.6f), center, Offset(center.x + r * 0.65f, center.y - r * 0.2f), strokeWidth = 1.dp.toPx())
+                drawLine(Color.White.copy(alpha = 0.6f), center, Offset(center.x - r * 0.65f, center.y - r * 0.2f), strokeWidth = 1.dp.toPx())
+            }
+            ObstacleType.EGGS -> {
+                // Ivory white egg
+                val rBound = Rect(center.x - r * 0.65f, center.y - r * 0.88f, center.x + r * 0.65f, center.y + r * 0.8f)
+                val eggPath = Path().apply {
+                    addOval(rBound)
+                }
+                drawPath(eggPath, Color(0xFFFFFDE7))
+                drawPath(eggPath, Color(0xFF8D6E63), style = Stroke(1.5.dp.toPx()))
+                
+                // Spots on egg
+                drawCircle(Color(0xFF81C784), radius = r * 0.12f, center = Offset(center.x - r * 0.24f, center.y))
+                drawCircle(Color(0xFF81C784), radius = r * 0.12f, center = Offset(center.x + r * 0.24f, center.y - r * 0.24f))
+                
+                // Cracks depending on durability
+                if (durability == 1) {
+                    drawLine(Color(0xFF4E342E), Offset(center.x - r * 0.1f, center.y - r * 0.4f), Offset(center.x + r * 0.15f, center.y), strokeWidth = 2.dp.toPx())
+                    drawLine(Color(0xFF4E342E), Offset(center.x + r * 0.15f, center.y), Offset(center.x - r * 0.2f, center.y + r * 0.35f), strokeWidth = 2.dp.toPx())
+                }
+            }
+            ObstacleType.BEE_HIVE -> {
+                // Golden tiered bee hive
+                val yStep = r * 0.38f
+                for (i in 0..3) {
+                    val scaleX = 1f - (i * 0.15f)
+                    drawRoundRect(
+                        color = Color(0xFFFFB300),
+                        topLeft = Offset(center.x - r * scaleX, center.y - r * 0.8f + i * yStep),
+                        size = Size(r * 2 * scaleX, r * 0.38f),
+                        cornerRadius = CornerRadius(r * 0.15f, r * 0.15f)
+                    )
+                    drawRoundRect(
+                        color = Color(0xFFE65100),
+                        topLeft = Offset(center.x - r * scaleX, center.y - r * 0.8f + i * yStep),
+                        size = Size(r * 2 * scaleX, r * 0.38f),
+                        cornerRadius = CornerRadius(r * 0.15f, r * 0.15f),
+                        style = Stroke(1.5.dp.toPx())
+                    )
+                }
+                // Honey entry doorway
+                drawCircle(Color(0xFF3E2723), radius = r * 0.25f, center = Offset(center.x, center.y + r * 0.1f))
             }
             else -> {}
+        }
+    }
+}
+
+// Juicy physics-simulated particle explosion for hit and broken obstacles/blockers
+@Composable
+fun ObstacleExplosionEffect(
+    type: ObstacleType,
+    isDestroy: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 650, easing = LinearOutSlowInEasing)
+        )
+    }
+
+    val p = progress.value
+    if (p >= 1f) return
+
+    Canvas(modifier = modifier) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val maxRadius = size.minDimension / 2f
+        
+        when (type) {
+            ObstacleType.CRATE -> {
+                // Splintering wood pieces & sawdust
+                val numChips = if (isDestroy) 10 else 4
+                for (i in 0 until numChips) {
+                    val angle = (i * 360f / numChips) + (p * 90f)
+                    val rad = Math.toRadians(angle.toDouble())
+                    // Pop speed
+                    val pushDist = maxRadius * (p * (if (isDestroy) 2.2f else 1.1f))
+                    val px = center.x + (cos(rad) * pushDist).toFloat()
+                    val py = center.y + (sin(rad) * pushDist).toFloat() + (p * p * maxRadius * 3.5f) // Gravity pull
+                    
+                    val pSize = maxRadius * 0.28f * (1f - p)
+                    val shadowOffset = 3.dp.toPx() * (1f - p)
+                    // Draw shadow
+                    drawRect(
+                        color = Color.Black.copy(alpha = 0.3f * (1f - p)),
+                        topLeft = Offset(px - pSize/2 + shadowOffset, py - pSize/2 + shadowOffset),
+                        size = Size(pSize, pSize)
+                    )
+                    // Draw wooden splinter
+                    drawRect(
+                        color = Color(0xFF5D4037),
+                        topLeft = Offset(px - pSize/2, py - pSize/2),
+                        size = Size(pSize, pSize)
+                    )
+                }
+            }
+            ObstacleType.STONE -> {
+                // Stone chunks
+                val numRocks = if (isDestroy) 8 else 3
+                for (i in 0 until numRocks) {
+                    val angle = (i * 360f / numRocks) - (p * 45f)
+                    val rad = Math.toRadians(angle.toDouble())
+                    val pushDist = maxRadius * (p * (if (isDestroy) 2.0f else 0.9f))
+                    val px = center.x + (cos(rad) * pushDist).toFloat()
+                    val py = center.y + (sin(rad) * pushDist).toFloat() + (p * p * maxRadius * 4.0f) // gravity
+                    
+                    val pRadius = maxRadius * 0.24f * (1f - p)
+                    val shadowOffset = 4.dp.toPx() * (1f - p)
+                    // Shadow
+                    drawCircle(
+                        color = Color.Black.copy(alpha = 0.35f * (1f - p)),
+                        radius = pRadius,
+                        center = Offset(px + shadowOffset, py + shadowOffset)
+                    )
+                    // Gray chunk
+                    drawCircle(
+                        color = Color(0xFF78909C),
+                        radius = pRadius,
+                        center = Offset(px, py)
+                    )
+                }
+            }
+            ObstacleType.ICE -> {
+                // Shimmering ice shards
+                val numShards = if (isDestroy) 12 else 5
+                for (i in 0 until numShards) {
+                    val angle = i * (360f / numShards) + (p * 180f)
+                    val rad = Math.toRadians(angle.toDouble())
+                    val pushDist = maxRadius * (p * (if (isDestroy) 2.5f else 1.3f))
+                    val px = center.x + (cos(rad) * pushDist).toFloat()
+                    val py = center.y + (sin(rad) * pushDist).toFloat() + (p * p * maxRadius * 2.8f) // gravity
+                    
+                    val pRadius = maxRadius * 0.2f * (1f - p)
+                    drawCircle(
+                        color = Color(0xE0E0F7FA).copy(alpha = 1f - p),
+                        radius = pRadius,
+                        center = Offset(px, py)
+                    )
+                }
+            }
+            ObstacleType.CHAIN -> {
+                // Snapping chain links flying left and right!
+                val numLinks = if (isDestroy) 6 else 2
+                for (i in 0 until numLinks) {
+                    val direction = if (i % 2 == 0) -1f else 1f
+                    val angle = i * 60f + p * 120f
+                    val rad = Math.toRadians(angle.toDouble())
+                    val vx = direction * maxRadius * 2.2f * p
+                    val vy = -maxRadius * (1f - p * 0.5f) * p + (p * p * maxRadius * 3.5f)
+                    
+                    val px = center.x + vx
+                    val py = center.y + vy
+                    
+                    val pRadius = maxRadius * 0.22f * (1f - p)
+                    drawCircle(
+                        color = Color(0xFFECEFF1).copy(alpha = 1f - p),
+                        radius = pRadius,
+                        center = Offset(px, py),
+                        style = Stroke(2.dp.toPx())
+                    )
+                }
+            }
+            ObstacleType.MAGIC_BARRIER -> {
+                // Purple rune explosion
+                drawCircle(
+                    color = Color(0xFFE040FB).copy(alpha = 0.8f * (1f - p)),
+                    radius = maxRadius * (1f + p * 1.5f),
+                    center = center,
+                    style = Stroke(3.dp.toPx() * (1f - p))
+                )
+                // Spark particles
+                val numSparks = 10
+                for (i in 0 until numSparks) {
+                    val angle = i * (360f / numSparks)
+                    val rad = Math.toRadians(angle.toDouble())
+                    val pushDist = maxRadius * 1.8f * p
+                    val px = center.x + (cos(rad) * pushDist).toFloat()
+                    val py = center.y + (sin(rad) * pushDist).toFloat()
+                    drawCircle(Color(0xFFFF00FF), radius = 3.dp.toPx() * (1f - p), center = Offset(px, py))
+                }
+            }
+            ObstacleType.APPLE, ObstacleType.CROWN, ObstacleType.SHIELD, ObstacleType.CRYSTAL -> {
+                // Upward pop and rapid lifting off board
+                val px = center.x
+                val py = center.y - (p * maxRadius * 4f)
+                val targetRadius = maxRadius * (1f + p * 0.5f)
+                val alpha = (1f - p)
+                
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.White.copy(alpha = alpha * 0.7f), Color.Transparent),
+                        center = Offset(px, py),
+                        radius = targetRadius * 1.5f
+                    ),
+                    radius = targetRadius * 1.5f,
+                    center = Offset(px, py)
+                )
+            }
+            else -> {
+                // Standard match pop bubble
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.7f * (1f - p)),
+                    radius = maxRadius * (1f + p * 1.2f),
+                    center = center,
+                    style = Stroke(2.dp.toPx())
+                )
+            }
         }
     }
 }
@@ -2742,6 +3413,111 @@ fun ShopPurchaseRow(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("${price}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun DecorativeBackgroundPattern() {
+    val infiniteTransition = rememberInfiniteTransition(label = "bg")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bgPulse"
+    )
+    val slowRotate by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(25000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "bgRotate"
+    )
+
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF140D24))) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            // Base warm sky radiant gradient
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF4C2A75), Color(0xFF1E0E3B), Color(0xFF0F0520)),
+                    center = Offset(size.width * 0.5f, size.height * 0.3f),
+                    radius = size.maxDimension * 0.9f
+                )
+            )
+
+            // Dynamic cosmic glowing clouds
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF8E24AA).copy(alpha = 0.25f * pulseAlpha), Color.Transparent),
+                    center = Offset(size.width * 0.2f, size.height * 0.4f),
+                    radius = size.maxDimension * 0.5f
+                ),
+                radius = size.maxDimension * 0.5f,
+                center = Offset(size.width * 0.2f, size.height * 0.4f)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF00B0FF).copy(alpha = 0.2f * (1.2f - pulseAlpha)), Color.Transparent),
+                    center = Offset(size.width * 0.8f, size.height * 0.7f),
+                    radius = size.maxDimension * 0.4f
+                ),
+                radius = size.maxDimension * 0.4f,
+                center = Offset(size.width * 0.8f, size.height * 0.7f)
+            )
+
+            // Radiant energy lines rotating behind the board
+            rotate(slowRotate) {
+                val numBeams = 12
+                val beamAngle = 360f / numBeams
+                for (i in 0 until numBeams) {
+                    val angle = i * beamAngle
+                    val rad = Math.toRadians(angle.toDouble())
+                    val endX = size.width / 2f + (cos(rad) * size.maxDimension).toFloat()
+                    val endY = size.height / 2f + (sin(rad) * size.maxDimension).toFloat()
+                    
+                    val path = Path().apply {
+                        moveTo(size.width / 2f, size.height / 2f)
+                        val radLeft = Math.toRadians((angle - beamAngle * 0.25f).toDouble())
+                        lineTo(
+                            (size.width / 2f + cos(radLeft) * size.maxDimension).toFloat(),
+                            (size.height / 2f + sin(radLeft) * size.maxDimension).toFloat()
+                        )
+                        lineTo(endX, endY)
+                        close()
+                    }
+                    drawPath(
+                        path = path,
+                        color = Color(0xFFFFD54F).copy(alpha = 0.03f)
+                    )
+                }
+            }
+
+            // Draw twinkling background stars
+            val starSeeds = listOf(
+                Offset(0.15f, 0.12f) to 4f,
+                Offset(0.85f, 0.18f) to 5f,
+                Offset(0.35f, 0.25f) to 3f,
+                Offset(0.72f, 0.32f) to 6f,
+                Offset(0.22f, 0.55f) to 4f,
+                Offset(0.88f, 0.62f) to 5f,
+                Offset(0.12f, 0.78f) to 4f,
+                Offset(0.55f, 0.88f) to 6f
+            )
+            for ((p, maxS) in starSeeds) {
+                val sx = p.x * size.width
+                val sy = p.y * size.height
+                val currentSize = maxS * (0.4f + 0.6f * sin((System.currentTimeMillis() * 0.002f + sx).toDouble()).toFloat())
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.7f),
+                    radius = currentSize,
+                    center = Offset(sx, sy)
+                )
             }
         }
     }

@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
@@ -35,10 +36,8 @@ enum class CandyType {
 
 enum class CandySpecial {
     NONE,
-    STRIPED_HORIZONTAL,
-    STRIPED_VERTICAL,
-    WRAPPED,
-    FISH
+    SPINNER,
+    TNT
 }
 
 @Composable
@@ -73,12 +72,12 @@ fun CandyIcon(
 
     Box(modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val baseScale = if (special == CandySpecial.WRAPPED) pulseScale * 1.05f else pulseScale
+            val baseScale = if (special == CandySpecial.TNT) pulseScale * 1.05f else pulseScale
             val candyRadius = size.minDimension / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
 
-            // Draw wrapped blast shadow/glow if needed
-            if (special == CandySpecial.WRAPPED || isGlow) {
+            // Draw TNT blast shadow/glow if needed
+            if (special == CandySpecial.TNT || isGlow) {
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
@@ -94,50 +93,50 @@ fun CandyIcon(
                 )
             }
 
-            // Draw core candy based on type
+            // Draw core candy based on type or standalone special
             scale(baseScale, baseScale, center) {
-                when (type) {
-                    CandyType.PURPLE_BERRY -> drawPurpleBerry(center, candyRadius)
-                    CandyType.RED_JELLYBEAN -> drawRedJellybean(center, candyRadius)
-                    CandyType.PINK_SWIRL -> drawPinkSwirl(center, candyRadius, spinRotation)
-                    CandyType.YELLOW_STAR -> drawYellowStar(center, candyRadius)
-                    CandyType.BLUE_GEM -> drawBlueGem(center, candyRadius)
-                    CandyType.CHOCO_BALL -> drawChocoBall(center, candyRadius)
-                    CandyType.ORANGE_STRIPED -> drawOrangeStriped(center, candyRadius)
-                    CandyType.GREEN_CUBE -> drawGreenCube(center, candyRadius)
-                    CandyType.COLOR_BOMB -> drawColorBomb(center, candyRadius, spinRotation)
+                if (special == CandySpecial.TNT) {
+                    drawTNT(center, candyRadius)
+                } else if (special == CandySpecial.SPINNER) {
+                    drawSpinner(center, candyRadius, spinRotation)
+                } else {
+                    when (type) {
+                        CandyType.PURPLE_BERRY -> drawPurpleBerry(center, candyRadius)
+                        CandyType.RED_JELLYBEAN -> drawRedJellybean(center, candyRadius)
+                        CandyType.PINK_SWIRL -> drawPinkSwirl(center, candyRadius, spinRotation)
+                        CandyType.YELLOW_STAR -> drawYellowStar(center, candyRadius)
+                        CandyType.BLUE_GEM -> drawBlueGem(center, candyRadius)
+                        CandyType.CHOCO_BALL -> drawChocoBall(center, candyRadius)
+                        CandyType.ORANGE_STRIPED -> drawOrangeStriped(center, candyRadius)
+                        CandyType.GREEN_CUBE -> drawGreenCube(center, candyRadius)
+                        CandyType.COLOR_BOMB -> drawDiscoBall(center, candyRadius, spinRotation)
+                    }
+
+                    if (type != CandyType.COLOR_BOMB) {
+                        // Global 3D Glass sphere visual highlights (makes flat 2D look highly glossy 3D!)
+                        // Top-Left Specular Gleam
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color.White.copy(alpha = 0.5f), Color.Transparent),
+                                center = Offset(center.x - candyRadius * 0.35f, center.y - candyRadius * 0.35f),
+                                radius = candyRadius * 0.65f
+                            ),
+                            radius = candyRadius * 0.65f,
+                            center = Offset(center.x - candyRadius * 0.35f, center.y - candyRadius * 0.35f)
+                        )
+
+                        // Bottom-Right Volumetric Dark Depth
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)),
+                                center = center,
+                                radius = candyRadius
+                            ),
+                            radius = candyRadius,
+                            center = center
+                        )
+                    }
                 }
-
-                // Draw special additions
-                when (special) {
-                    CandySpecial.STRIPED_HORIZONTAL -> drawStripedOverlay(center, candyRadius, isHorizontal = true, spinRotation)
-                    CandySpecial.STRIPED_VERTICAL -> drawStripedOverlay(center, candyRadius, isHorizontal = false, spinRotation)
-                    CandySpecial.FISH -> drawFishDetails(center, candyRadius)
-                    else -> {}
-                }
-
-                // Global 3D Glass sphere visual highlights (makes flat 2D look highly glossy 3D!)
-                // Top-Left Specular Gleam
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.5f), Color.Transparent),
-                        center = Offset(center.x - candyRadius * 0.35f, center.y - candyRadius * 0.35f),
-                        radius = candyRadius * 0.65f
-                    ),
-                    radius = candyRadius * 0.65f,
-                    center = Offset(center.x - candyRadius * 0.35f, center.y - candyRadius * 0.35f)
-                )
-
-                // Bottom-Right Volumetric Dark Depth
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)),
-                        center = center,
-                        radius = candyRadius
-                    ),
-                    radius = candyRadius,
-                    center = center
-                )
             }
         }
     }
@@ -641,116 +640,316 @@ private fun DrawScope.drawGreenCube(center: Offset, radius: Float) {
     )
 }
 
-// 9. Color Bomb (swirling rainbow magic core)
-private fun DrawScope.drawColorBomb(center: Offset, radius: Float, rotation: Float) {
+// 9. Disco Ball (retro mirror tiles with swirling rainbow magic and bright electric lines)
+private fun DrawScope.drawDiscoBall(center: Offset, radius: Float, rotation: Float) {
     val r = radius * 0.95f
-
-    // Thick black shadow
+    
+    // Ambient back shadow
     drawCircle(
-        color = Color(0x66000000),
+        color = Color.Black.copy(alpha = 0.4f),
         radius = r,
         center = Offset(center.x + 3f, center.y + 5f)
     )
-
-    // Cosmic black obsidian core
+    
+    // Metallic base gradient
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(Color(0xFF37474F), Color(0xFF102027)),
+            colors = listOf(Color(0xFFECEFF1), Color(0xFF455A64)),
             center = center,
             radius = r
         ),
-        radius = r,
-        center = center
+        radius = r
     )
-
-    // Swirling rainbow galaxy rings around the core
-    rotate(rotation, center) {
-        val rainbowColors = listOf(
-            Color(0xFFFF1744),
-            Color(0xFFFF9100),
-            Color(0xFFFFEA00),
-            Color(0xFF00E676),
-            Color(0xFF00E5FF),
-            Color(0xFFD500F9)
-        )
-        
-        for (idx in rainbowColors.indices) {
-            val c = rainbowColors[idx]
-            val ringRadius = r * (0.4f + idx * 0.09f)
-            drawCircle(
-                color = c,
-                radius = ringRadius,
-                center = center,
-                style = Stroke(width = 3.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 25f), rotation))
-            )
+    
+    // Draw grid of disco tiles
+    val gridCount = 6
+    val sizeW = (r * 2f) / gridCount
+    
+    clipPath(Path().apply { addOval(Rect(center.x - r, center.y - r, center.x + r, center.y + r)) }) {
+        rotate(rotation, center) {
+            for (i in 0..gridCount) {
+                for (j in 0..gridCount) {
+                    val tileX = center.x - r + i * sizeW
+                    val tileY = center.y - r + j * sizeW
+                    
+                    // Rainbow reflective color sequence based on tile position & rotation
+                    val tileColor = when ((i + j + (rotation / 30).toInt()) % 6) {
+                        0 -> Color(0xFFFF1744) // Red
+                        1 -> Color(0xFFFF9100) // Orange
+                        2 -> Color(0xFFFFEA00) // Yellow
+                        3 -> Color(0xFF00E676) // Green
+                        4 -> Color(0xFF00E5FF) // Blue
+                        else -> Color(0xFFD500F9) // Purple
+                    }
+                    
+                    drawRect(
+                        color = tileColor,
+                        topLeft = Offset(tileX + 1.5f, tileY + 1.5f),
+                        size = Size(sizeW - 3f, sizeW - 3f)
+                    )
+                    
+                    // Shine core on each tile
+                    drawRect(
+                        color = Color.White.copy(alpha = 0.6f),
+                        topLeft = Offset(tileX + 3f, tileY + 3f),
+                        size = Size((sizeW - 3f)/3f, (sizeW - 3f)/3f)
+                    )
+                }
+            }
         }
     }
-
-    // Rotating small glossy stars / circles representing sparkly sprinkle energy
-    rotate(-rotation * 1.5f, center) {
-        val sparkles = listOf(
-            Offset(-r * 0.5f, -r * 0.5f) to Color(0xFFFF9100),
-            Offset(r * 0.6f, -r * 0.2f) to Color(0xFF00E5FF),
-            Offset(-r * 0.4f, r * 0.5f) to Color(0xFFD500F9),
-            Offset(r * 0.4f, r * 0.4f) to Color(0xFFFFEA00)
-        )
-        for ((pos, col) in sparkles) {
-            drawCircle(
-                color = col,
-                radius = r * 0.15f,
-                center = Offset(center.x + pos.x, center.y + pos.y)
+    
+    // Beautiful metal outline
+    drawCircle(
+        color = Color(0xFFCFD8DC),
+        radius = r,
+        style = Stroke(1.5f.dp.toPx())
+    )
+    
+    // Sparkles and rays
+    val numRays = 8
+    rotate(-rotation * 0.5f, center) {
+        for (i in 0 until numRays) {
+            val angle = i * (360f / numRays)
+            val rad = Math.toRadians(angle.toDouble())
+            val startRadius = r * 0.85f
+            val endRadius = r * (1.1f + 0.15f * sin(rotation * 0.1f + i).toFloat())
+            val startX = center.x + (cos(rad) * startRadius).toFloat()
+            val startY = center.y + (sin(rad) * startRadius).toFloat()
+            val endX = center.x + (cos(rad) * endRadius).toFloat()
+            val endY = center.y + (sin(rad) * endRadius).toFloat()
+            
+            // Draw colorful neon beam style
+            val neonColor = when (i % 4) {
+                0 -> Color(0xFFFF1744)
+                1 -> Color(0xFF00E5FF)
+                2 -> Color(0xFFFFEA00)
+                else -> Color(0xFFD500F9)
+            }
+            drawLine(
+                color = neonColor.copy(alpha = 0.7f),
+                start = Offset(startX, startY),
+                end = Offset(endX, endY),
+                strokeWidth = 2.5f.dp.toPx()
             )
-            // inner sparkling highlight core
-            drawCircle(
+            drawLine(
                 color = Color.White,
-                radius = r * 0.06f,
-                center = Offset(center.x + pos.x - 2f, center.y + pos.y - 2f)
+                start = Offset(startX, startY),
+                end = Offset(endX, endY),
+                strokeWidth = 0.8f.dp.toPx()
             )
         }
     }
+}
 
-    // Glowing white cosmic overlay reflection
+// 10. Spinner (aerodynamic rotating propeller blade wings)
+private fun DrawScope.drawSpinner(center: Offset, radius: Float, rotation: Float, unfoldProgress: Float = 1.0f) {
+    val r = radius * 0.85f
+    
+    // Outer circular motion blur path
+    drawCircle(
+        color = Color(0x2200E5FF),
+        radius = r * 1.1f,
+        center = center,
+        style = Stroke(2.5f.dp.toPx())
+    )
+    
+    rotate(rotation, center) {
+        // Draw 3 propeller wings (turbines)
+        val numBlades = 3
+        for (i in 0 until numBlades) {
+            val angle = i * (360f / numBlades)
+            val rad = Math.toRadians(angle.toDouble())
+            
+            val bladeLength = r * unfoldProgress
+            val bladeWidth = r * 0.35f
+            
+            val bladePath = Path().apply {
+                moveTo(center.x, center.y)
+                val lx = center.x + (cos(rad) * bladeLength * 0.4f).toFloat() - (sin(rad) * bladeWidth * 0.5f).toFloat()
+                val ly = center.y + (sin(rad) * bladeLength * 0.4f).toFloat() + (cos(rad) * bladeWidth * 0.5f).toFloat()
+                val tx = center.x + (cos(rad) * bladeLength).toFloat()
+                val ty = center.y + (sin(rad) * bladeLength).toFloat()
+                val rx = center.x + (cos(rad) * bladeLength * 0.7f).toFloat() + (sin(rad) * bladeWidth * 0.3f).toFloat()
+                val ry = center.y + (sin(rad) * bladeLength * 0.7f).toFloat() - (cos(rad) * bladeWidth * 0.3f).toFloat()
+                
+                lineTo(lx, ly)
+                quadraticTo(tx - (sin(rad)*5f).toFloat(), ty + (cos(rad)*5f).toFloat(), tx, ty)
+                quadraticTo(rx, ry, center.x, center.y)
+                close()
+            }
+            
+            val bladeColor = when (i) {
+                0 -> Brush.linearGradient(listOf(Color(0xFF00E5FF), Color(0xFF2979FF)))
+                1 -> Brush.linearGradient(listOf(Color(0xFFFFEA00), Color(0xFFFF9100)))
+                else -> Brush.linearGradient(listOf(Color(0xFFE040FB), Color(0xFF9013FE)))
+            }
+            
+            drawPath(bladePath, bladeColor)
+            
+            // Shininess highlighted core line on blade
+            drawLine(
+                color = Color.White.copy(alpha = 0.5f),
+                start = center,
+                end = Offset(center.x + (cos(rad)*bladeLength*0.8f).toFloat(), center.y + (sin(rad)*bladeLength*0.8f).toFloat()),
+                strokeWidth = 1.5f.dp.toPx()
+            )
+        }
+    }
+    
+    // Polished golden central cap
+    drawCircle(
+        color = Color(0x44000000),
+        radius = r * 0.28f,
+        center = Offset(center.x + 1f, center.y + 2f)
+    )
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(Color.White.copy(alpha = 0.8f), Color.Transparent),
-            center = Offset(center.x - r * 0.3f, center.y - r * 0.3f),
-            radius = r * 0.45f
+            colors = listOf(Color(0xFFFFD54F), Color(0xFFF57F17)),
+            center = center,
+            radius = r * 0.25f
         ),
-        radius = r * 0.45f,
-        center = Offset(center.x - r * 0.3f, center.y - r * 0.3f)
+        radius = r * 0.25f
+    )
+    drawCircle(
+        color = Color.White.copy(alpha = 0.8f),
+        radius = r * 0.08f,
+        center = Offset(center.x - r * 0.07f, center.y - r * 0.07f)
     )
 }
 
-// 10. Draw horizontal/vertical stripes (lasers!) on Striped Candies
-private fun DrawScope.drawStripedOverlay(center: Offset, radius: Float, isHorizontal: Boolean, rotation: Float) {
-    val r = radius * 0.95f
-    val strokeW = r * 0.18f
+// 11. TNT (triple dynamite bundled together with brown fuse & sparking element)
+private fun DrawScope.drawTNT(center: Offset, radius: Float) {
+    val r = radius * 0.85f
+    val w = r * 0.35f
+    val h = r * 1.3f
+    
+    // Shadow base
+    drawRoundRect(
+        color = Color.Black.copy(alpha = 0.4f),
+        topLeft = Offset(center.x - w * 1.45f + 2f, center.y - h / 2f + 4f),
+        size = Size(w * 2.9f, h),
+        cornerRadius = CornerRadius(4.dp.toPx())
+    )
+    
+    val leftOffset = -w * 0.88f
+    val rightOffset = w * 0.88f
+    
+    // Three dynamite sticks
+    drawDynamiteStick(Offset(center.x + leftOffset, center.y), w, h)
+    drawDynamiteStick(Offset(center.x + rightOffset, center.y), w, h)
+    drawDynamiteStick(Offset(center.x, center.y), w, h)
+    
+    // Binding black straps
+    drawRect(
+        color = Color(0xFF212121),
+        topLeft = Offset(center.x - w * 1.35f, center.y - h * 0.25f),
+        size = Size(w * 2.7f, h * 0.12f)
+    )
+    drawRect(
+        color = Color(0xFF212121),
+        topLeft = Offset(center.x - w * 1.35f, center.y + h * 0.15f),
+        size = Size(w * 2.7f, h * 0.12f)
+    )
+    
+    // Fuse
+    val fuseStart = Offset(center.x, center.y - h / 2f)
+    val fuseCtrl = Offset(center.x + r * 0.3f, center.y - h * 0.7f)
+    val fuseEnd = Offset(center.x + r * 0.5f, center.y - h * 0.8f)
+    
+    val fusePath = Path().apply {
+        moveTo(fuseStart.x, fuseStart.y)
+        quadraticTo(fuseCtrl.x, fuseCtrl.y, fuseEnd.x, fuseEnd.y)
+    }
+    drawPath(
+        path = fusePath,
+        color = Color(0xFF5D4037),
+        style = Stroke(2.5f.dp.toPx(), cap = StrokeCap.Round)
+    )
+    
+    // Burning fuse spark fire circle
+    val sparkRadius = 5.dp.toPx()
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color.White, Color(0xFFFFD54F), Color(0xFFFF3D00), Color.Transparent),
+            center = fuseEnd,
+            radius = sparkRadius * 2.5f
+        ),
+        radius = sparkRadius * 2.5f,
+        center = fuseEnd
+    )
+    // Star crosses
+    drawLine(Color.White, Offset(fuseEnd.x - sparkRadius, fuseEnd.y), Offset(fuseEnd.x + sparkRadius, fuseEnd.y), strokeWidth = 1.5f.dp.toPx())
+    drawLine(Color.White, Offset(fuseEnd.x, fuseEnd.y - sparkRadius), Offset(fuseEnd.x, fuseEnd.y + sparkRadius), strokeWidth = 1.5f.dp.toPx())
+}
 
-    rotate(if (isHorizontal) 0f else 90f, center) {
-        // High-energy white laser beam across candy
-        drawLine(
-            brush = Brush.linearGradient(
-                colors = listOf(Color.Transparent, Color.White, Color.White, Color.Transparent)
-            ),
-            start = Offset(center.x - r * 1.3f, center.y),
-            end = Offset(center.x + r * 1.3f, center.y),
-            strokeWidth = strokeW,
-            cap = StrokeCap.Round
-        )
-        
-        // Secondary energy pulse stripes
-        drawLine(
-            color = Color.White.copy(alpha = 0.7f),
-            start = Offset(center.x - r * 0.8f, center.y - strokeW * 0.8f),
-            end = Offset(center.x - r * 0.4f, center.y - strokeW * 0.8f),
-            strokeWidth = 2.dp.toPx()
-        )
-        drawLine(
-            color = Color.White.copy(alpha = 0.7f),
-            start = Offset(center.x + r * 0.4f, center.y + strokeW * 0.8f),
-            end = Offset(center.x + r * 0.8f, center.y + strokeW * 0.8f),
-            strokeWidth = 2.dp.toPx()
-        )
+private fun DrawScope.drawDynamiteStick(center: Offset, width: Float, height: Float) {
+    val left = center.x - width / 2
+    val top = center.y - height / 2
+    
+    // Cylinder body
+    drawRoundRect(
+        brush = Brush.linearGradient(
+            colors = listOf(Color(0xFFFF1744), Color(0xFF880E4F)),
+            start = Offset(left, top),
+            end = Offset(left + width, top)
+        ),
+        topLeft = Offset(left, top),
+        size = Size(width, height),
+        cornerRadius = CornerRadius(2.5f.dp.toPx())
+    )
+    
+    val capHeight = height * 0.08f
+    drawRoundRect(
+        color = Color(0xFF263238),
+        topLeft = Offset(left, top),
+        size = Size(width, capHeight),
+        cornerRadius = CornerRadius(1.5f.dp.toPx())
+    )
+    
+    // Shiny specular side line
+    drawLine(
+        color = Color.White.copy(alpha = 0.35f),
+        start = Offset(left + width * 0.25f, top + capHeight),
+        end = Offset(left + width * 0.25f, top + height - capHeight),
+        strokeWidth = 1f.dp.toPx()
+    )
+}
+
+// 10. Draw horizontal/vertical stripes (with bright glossy candy stripe highlights!)
+private fun DrawScope.drawStripedOverlay(center: Offset, radius: Float, isHorizontal: Boolean, rotation: Float) {
+    val r = radius * 0.9f
+    val numStripes = 4
+    val stripeWidth = r * 0.16f
+    val spacing = r * 0.45f
+
+    // Iconic 3D high-energy candy stripes
+    rotate(if (isHorizontal) -30f else 60f, center) {
+        for (i in -2..2) {
+            val offset = i * spacing
+            // Draw a soft glowing halo behind each candy stripe
+            drawLine(
+                color = Color.White.copy(alpha = 0.25f),
+                start = Offset(center.x - r * 1.1f, center.y + offset),
+                end = Offset(center.x + r * 1.1f, center.y + offset),
+                strokeWidth = stripeWidth * 1.8f,
+                cap = StrokeCap.Round
+            )
+            // Main solid white glossy stripe
+            drawLine(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.3f),
+                        Color.White,
+                        Color.White.copy(alpha = 0.3f)
+                    )
+                ),
+                start = Offset(center.x - r * 1.1f, center.y + offset),
+                end = Offset(center.x + r * 1.1f, center.y + offset),
+                strokeWidth = stripeWidth,
+                cap = StrokeCap.Round
+            )
+        }
     }
 }
 
@@ -810,7 +1009,7 @@ fun CandyExplosionEffect(
     LaunchedEffect(Unit) {
         progress.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing)
+            animationSpec = tween(durationMillis = 750, easing = LinearEasing)
         )
     }
 
@@ -821,56 +1020,248 @@ fun CandyExplosionEffect(
         val center = Offset(size.width / 2f, size.height / 2f)
         val maxRadius = size.minDimension / 2f
 
-        // 1. Expanding shockwave concentric rings
-        drawCircle(
-            color = color.copy(alpha = (1f - p) * 0.8f),
-            radius = maxRadius * (0.1f + p * 1.6f),
-            center = center,
-            style = Stroke(width = (4.dp.toPx() * (1f - p)))
-        )
-        
-        drawCircle(
-            color = Color.White.copy(alpha = (1f - p) * 0.4f),
-            radius = maxRadius * (0.05f + p * 1.2f),
-            center = center,
-            style = Stroke(width = (2.dp.toPx() * (1f - p)))
-        )
-
-        // 2. Flying candy Shards or Juice Drops (8 particles)
-        val numParticles = 8
-        for (i in 0 until numParticles) {
-            val angleDeg = i * (360f / numParticles) + (p * 50f)
-            val angleRad = Math.toRadians(angleDeg.toDouble())
-            val distance = maxRadius * (p * 1.9f)
-            val px = center.x + (cos(angleRad) * distance).toFloat()
-            val py = center.y + (sin(angleRad) * distance).toFloat()
-            
-            val pRadius = maxRadius * 0.25f * (1f - p)
-            
+        // 1. Expanding shockwave concentric rings (happens quickly in first 50% of progress)
+        val shockwaveP = (p / 0.5f).coerceAtMost(1f)
+        if (shockwaveP < 1f) {
             drawCircle(
-                color = color,
-                radius = pRadius,
-                center = Offset(px, py)
+                color = color.copy(alpha = (1f - shockwaveP) * 0.8f),
+                radius = maxRadius * (0.1f + shockwaveP * 1.6f),
+                center = center,
+                style = Stroke(width = (4.dp.toPx() * (1f - shockwaveP)))
             )
             
-            // Bright white sheen on some particles
-            if (i % 2 == 0) {
+            drawCircle(
+                color = Color.White.copy(alpha = (1f - shockwaveP) * 0.4f),
+                radius = maxRadius * (0.05f + shockwaveP * 1.2f),
+                center = center,
+                style = Stroke(width = (2.dp.toPx() * (1f - shockwaveP)))
+            )
+        }
+
+        // 2. Flying candy Shards or Juice Drops radiating outwards (first 60% of progress)
+        val radialP = (p / 0.6f).coerceAtMost(1f)
+        if (radialP < 1f) {
+            val numParticles = 8
+            for (i in 0 until numParticles) {
+                val angleDeg = i * (360f / numParticles) + (radialP * 50f)
+                val angleRad = Math.toRadians(angleDeg.toDouble())
+                val distance = maxRadius * (radialP * 1.9f)
+                val px = center.x + (cos(angleRad) * distance).toFloat()
+                val py = center.y + (sin(angleRad) * distance).toFloat()
+                
+                val pRadius = maxRadius * 0.25f * (1f - radialP)
+                
                 drawCircle(
-                    color = Color.White.copy(alpha = (1f - p)),
-                    radius = pRadius * 0.4f,
-                    center = Offset(px - pRadius * 0.2f, py - pRadius * 0.2f)
+                    color = color.copy(alpha = (1f - radialP)),
+                    radius = pRadius,
+                    center = Offset(px, py)
                 )
+                
+                if (i % 2 == 0) {
+                    drawCircle(
+                        color = Color.White.copy(alpha = (1f - radialP) * 0.8f),
+                        radius = pRadius * 0.4f,
+                        center = Offset(px - pRadius * 0.2f, py - pRadius * 0.2f)
+                    )
+                }
             }
         }
 
         // 3. Center flash and remaining imploding core
-        if (p < 0.6f) {
-            val coreScale = (1f - p / 0.6f)
+        if (p < 0.4f) {
+            val coreScale = (1f - p / 0.4f)
             drawCircle(
-                color = Color.White.copy(alpha = (1f - p) * 0.9f),
+                color = Color.White.copy(alpha = (1f - p * 2.5f).coerceAtLeast(0f)),
                 radius = maxRadius * 0.6f * coreScale,
                 center = center
             )
+        }
+
+        // 4. Detailed candy pieces popping up and falling down with simulated gravity and shadows!
+        val shardRadius = maxRadius * 0.38f
+        for (j in 0..2) {
+            // Horizontal and vertical velocity setup (pops left-ish, center-up, right-ish)
+            val vx = when (j) {
+                0 -> -maxRadius * 2.2f
+                1 -> maxRadius * 0.4f
+                else -> maxRadius * 1.8f
+            }
+            val vy = when (j) {
+                0 -> -maxRadius * 4.2f
+                1 -> -maxRadius * 5.8f
+                else -> -maxRadius * 3.5f
+            }
+            // Gravitational pull accelerating downwards over progresses
+            val gravityY = maxRadius * 15f
+            
+            val dx = vx * p
+            val dy = vy * p + 0.5f * gravityY * p * p
+            
+            val shardCenter = Offset(center.x + dx, center.y + dy)
+            val shadowCenter = Offset(center.x + dx + 6.dp.toPx(), center.y + dy + 10.dp.toPx())
+            val tumbleRotation = j * 120f + p * 360f
+
+            // A. DRAW SEPARATE DEPTH SHADOW FIRST (Rendered behind the colored pieces)
+            drawContext.canvas.save()
+            rotate(tumbleRotation, shadowCenter) {
+                val shadowColor = Color.Black.copy(alpha = 0.38f * (1f - p))
+                when (type) {
+                    CandyType.YELLOW_STAR -> {
+                        val shadowStar = Path().apply {
+                            val innerR = shardRadius * 0.45f
+                            val outerR = shardRadius
+                            for (i in 0 until 10) {
+                                val angle = i * Math.PI / 5 - Math.PI / 2
+                                val rCurr = if (i % 2 == 0) outerR else innerR
+                                val x = shadowCenter.x + rCurr * cos(angle).toFloat()
+                                val y = shadowCenter.y + rCurr * sin(angle).toFloat()
+                                if (i == 0) moveTo(x, y) else lineTo(x, y)
+                            }
+                            close()
+                        }
+                        drawPath(shadowStar, shadowColor)
+                    }
+                    CandyType.BLUE_GEM -> {
+                        val shadowGem = Path().apply {
+                            moveTo(shadowCenter.x, shadowCenter.y - shardRadius)
+                            lineTo(shadowCenter.x + shardRadius * 0.82f, shadowCenter.y)
+                            lineTo(shadowCenter.x, shadowCenter.y + shardRadius)
+                            lineTo(shadowCenter.x - shardRadius * 0.82f, shadowCenter.y)
+                            close()
+                        }
+                        drawPath(shadowGem, shadowColor)
+                    }
+                    CandyType.GREEN_CUBE -> {
+                        drawRect(
+                            color = shadowColor,
+                            topLeft = Offset(shadowCenter.x - shardRadius * 0.8f, shadowCenter.y - shardRadius * 0.8f),
+                            size = Size(shardRadius * 1.6f, shardRadius * 1.6f)
+                        )
+                    }
+                    else -> {
+                        drawCircle(
+                            color = shadowColor,
+                            radius = shardRadius,
+                            center = shadowCenter
+                        )
+                    }
+                }
+            }
+            drawContext.canvas.restore()
+
+            // B. DRAW THE MAIN COLORED SHARD SHAPE ON TOP
+            drawContext.canvas.save()
+            rotate(tumbleRotation, shardCenter) {
+                val shardAlpha = (1f - p * 0.25f)
+                val shardColor = color.copy(alpha = shardAlpha)
+                
+                when (type) {
+                    CandyType.YELLOW_STAR -> {
+                        val starPath = Path().apply {
+                            val innerR = shardRadius * 0.45f
+                            val outerR = shardRadius
+                            for (i in 0 until 10) {
+                                val angle = i * Math.PI / 5 - Math.PI / 2
+                                val rCurr = if (i % 2 == 0) outerR else innerR
+                                val x = shardCenter.x + rCurr * cos(angle).toFloat()
+                                val y = shardCenter.y + rCurr * sin(angle).toFloat()
+                                if (i == 0) moveTo(x, y) else lineTo(x, y)
+                            }
+                            close()
+                        }
+                        drawPath(
+                            path = starPath,
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFFFFF9C4).copy(alpha = shardAlpha), shardColor),
+                                center = shardCenter,
+                                radius = shardRadius
+                            )
+                        )
+                        drawPath(starPath, Color.White.copy(alpha = 0.5f * shardAlpha), style = Stroke(1.5.dp.toPx()))
+                    }
+                    CandyType.BLUE_GEM -> {
+                        val gemPath = Path().apply {
+                            moveTo(shardCenter.x, shardCenter.y - shardRadius)
+                            lineTo(shardCenter.x + shardRadius * 0.8f, shardCenter.y)
+                            lineTo(shardCenter.x, shardCenter.y + shardRadius)
+                            lineTo(shardCenter.x - shardRadius * 0.8f, shardCenter.y)
+                            close()
+                        }
+                        drawPath(
+                            path = gemPath,
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFFE0F7FA).copy(alpha = shardAlpha), shardColor, Color(0xFF006064).copy(alpha = shardAlpha)),
+                                start = Offset(shardCenter.x - shardRadius, shardCenter.y - shardRadius),
+                                end = Offset(shardCenter.x + shardRadius, shardCenter.y + shardRadius)
+                            )
+                        )
+                        drawPath(gemPath, Color.White.copy(alpha = 0.4f * shardAlpha), style = Stroke(1.5.dp.toPx()))
+                    }
+                    CandyType.GREEN_CUBE -> {
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color(0xFFB9F6CA).copy(alpha = shardAlpha), shardColor, Color(0xFF004D40).copy(alpha = shardAlpha))
+                            ),
+                            topLeft = Offset(shardCenter.x - shardRadius * 0.8f, shardCenter.y - shardRadius * 0.8f),
+                            size = Size(shardRadius * 1.6f, shardRadius * 1.6f)
+                        )
+                        drawRect(
+                            color = Color.White.copy(alpha = 0.4f * shardAlpha),
+                            topLeft = Offset(shardCenter.x - shardRadius * 0.8f, shardCenter.y - shardRadius * 0.8f),
+                            size = Size(shardRadius * 1.6f, shardRadius * 1.6f),
+                            style = Stroke(1.5.dp.toPx())
+                        )
+                    }
+                    CandyType.CHOCO_BALL -> {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF8D6E63).copy(alpha = shardAlpha), shardColor, Color(0xFF3E2723).copy(alpha = shardAlpha)),
+                                center = shardCenter,
+                                radius = shardRadius
+                            ),
+                            radius = shardRadius,
+                            center = shardCenter
+                        )
+                        drawCircle(Color(0xFF00E676).copy(alpha = shardAlpha), radius = shardRadius * 0.2f, center = Offset(shardCenter.x - shardRadius * 0.3f, shardCenter.y - shardRadius * 0.3f))
+                        drawCircle(Color(0xFFFFEA00).copy(alpha = shardAlpha), radius = shardRadius * 0.2f, center = Offset(shardCenter.x + shardRadius * 0.3f, shardCenter.y + shardRadius * 0.2f))
+                    }
+                    CandyType.PURPLE_BERRY -> {
+                        val offsets = listOf(
+                            Offset(shardCenter.x - shardRadius * 0.3f, shardCenter.y - shardRadius * 0.2f),
+                            Offset(shardCenter.x + shardRadius * 0.3f, shardCenter.y - shardRadius * 0.2f),
+                            Offset(shardCenter.x, shardCenter.y + shardRadius * 0.3f)
+                        )
+                        for (off in offsets) {
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(Color(0xFFEA80FC).copy(alpha = shardAlpha), shardColor),
+                                    center = off,
+                                    radius = shardRadius * 0.5f
+                                ),
+                                radius = shardRadius * 0.5f,
+                                center = off
+                            )
+                        }
+                    }
+                    else -> {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color.White.copy(alpha = 0.5f * shardAlpha), shardColor),
+                                center = shardCenter,
+                                radius = shardRadius
+                            ),
+                            radius = shardRadius,
+                            center = shardCenter
+                        )
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.6f * shardAlpha),
+                            radius = shardRadius * 0.25f,
+                            center = Offset(shardCenter.x - shardRadius * 0.35f, shardCenter.y - shardRadius * 0.35f)
+                        )
+                    }
+                }
+            }
+            drawContext.canvas.restore()
         }
     }
 }

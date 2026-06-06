@@ -6,13 +6,18 @@ import kotlin.math.abs
 // Data class representing an individual tile's obstacle
 enum class ObstacleType {
     NONE,
-    CRATE,        // Needs adjacent match to break
-    ICE,          // Covers candy, 3 layers of durability cracks
-    CHAIN,        // Candy locked, cannot be swapped until cleared
-    CHOCOLATE,    // Spreads if not matched, clears when matched
-    BARREL,       // Needs adjacent match, 4 layers of durability
-    CRYSTAL_CAGE, // Blocks swap, 3 layers of durability
-    HONEY         // Sticky coating, 3 layers of durability
+    CRATE,          // WOODEN CRATE (HP 1-3)
+    STONE,          // STONE BLOCK (HP 2-5)
+    ICE,            // ICE BLOCK (HP 1-3)
+    CHAIN,          // CHAIN (Locks Tile, HP 1)
+    MAGIC_BARRIER,  // MAGIC BARRIER (Blocks swapping, HP 1-3)
+    CHOCOLATE,      // CHOCOLATE SPREAD (HP 1)
+    APPLE,          // GOAL: COLLECT APPLES (HP 1)
+    CROWN,          // GOAL: COLLECT CROWNS (HP 1)
+    SHIELD,         // GOAL: COLLECT SHIELDS (HP 1)
+    CRYSTAL,        // GOAL: COLLECT GEMS (HP 2)
+    EGGS,           // GOAL: EGGS (HP 2)
+    BEE_HIVE        // GOAL: BEE HIVE (HP 3)
 }
 
 // Model representing a single candy block on our board
@@ -24,10 +29,10 @@ data class CandyItem(
     var isExploding: Boolean = false
 )
 
-// Active matching goal
+// Active matching goal - strictly blocker/obstacle targets
 data class LevelGoal(
-    val type: CandyType?, // null if it's general score or a blocker
-    val isBlocker: Boolean = false,
+    val type: CandyType? = null, // unused but kept for compatibility
+    val isBlocker: Boolean = true,
     val blockerType: ObstacleType = ObstacleType.NONE,
     val targetCount: Int,
     var currentCount: Int = 0
@@ -67,7 +72,7 @@ object LevelGenerator {
         }
 
         // Moves
-        val moves = 20 + rand.nextInt(16) // 20 - 35 moves
+        val moves = (22 + rand.nextInt(10) - (level / 12)).coerceAtLeast(15)
 
         // Target Score
         val targetScore = 5000 + (level * 1200)
@@ -94,69 +99,74 @@ object LevelGenerator {
         )
         val selectedCandies = allTypes.take(colorCount)
 
-        // Goals selection
+        // NO candy goals! Goals are strictly blocker targets.
         val goals = mutableListOf<LevelGoal>()
         if (isBossBattle) {
             // High boss hp represented as target matching score/powerups
-            goals.add(LevelGoal(type = null, isBlocker = false, targetCount = targetScore))
+            goals.add(LevelGoal(isBlocker = true, blockerType = ObstacleType.MAGIC_BARRIER, targetCount = 12))
         } else {
-            // Target specific candies
-            val primaryCandy = selectedCandies[rand.nextInt(selectedCandies.size)]
-            goals.add(LevelGoal(type = primaryCandy, targetCount = 15 + level * 2))
-            
-            // Maybe secondary goals
-            if (level > 3) {
-                val secondaryCandy = selectedCandies.filter { it != primaryCandy }.random(rand)
-                goals.add(LevelGoal(type = secondaryCandy, targetCount = 10 + level))
+            // Select 1 to 2 random obstacle types for goals based on level
+            val availableObstacles = mutableListOf(ObstacleType.CRATE)
+            if (level > 2) availableObstacles.add(ObstacleType.ICE)
+            if (level > 4) availableObstacles.add(ObstacleType.CHAIN)
+            if (level > 7) availableObstacles.add(ObstacleType.STONE)
+            if (level > 10) availableObstacles.add(ObstacleType.MAGIC_BARRIER)
+            if (level > 13) {
+                availableObstacles.add(ObstacleType.APPLE)
+                availableObstacles.add(ObstacleType.CROWN)
             }
-            // Add progressive block clearing goals
-            if (level > 8) {
-                val bType = when {
-                    level < 15 -> listOf(ObstacleType.CRATE, ObstacleType.ICE).random(rand)
-                    level < 25 -> listOf(ObstacleType.CRATE, ObstacleType.ICE, ObstacleType.BARREL).random(rand)
-                    level < 35 -> listOf(ObstacleType.CRATE, ObstacleType.ICE, ObstacleType.BARREL, ObstacleType.HONEY).random(rand)
-                    else -> listOf(ObstacleType.ICE, ObstacleType.BARREL, ObstacleType.CRYSTAL_CAGE, ObstacleType.HONEY).random(rand)
+            if (level > 16) {
+                availableObstacles.add(ObstacleType.SHIELD)
+                availableObstacles.add(ObstacleType.CRYSTAL)
+            }
+            if (level > 20) {
+                availableObstacles.add(ObstacleType.EGGS)
+                availableObstacles.add(ObstacleType.BEE_HIVE)
+                availableObstacles.add(ObstacleType.CHOCOLATE)
+            }
+
+            availableObstacles.shuffle(rand)
+            
+            val goalCount = when {
+                level < 5 -> 1
+                level < 15 -> 2
+                else -> 3
+            }
+            val selectedGoalsType = availableObstacles.take(goalCount)
+            
+            for (gType in selectedGoalsType) {
+                val baseCount = when (gType) {
+                    ObstacleType.CRATE -> 5
+                    ObstacleType.STONE -> 4
+                    ObstacleType.ICE -> 5
+                    ObstacleType.CHAIN -> 4
+                    ObstacleType.MAGIC_BARRIER -> 4
+                    else -> 4
                 }
-                goals.add(LevelGoal(type = null, isBlocker = true, blockerType = bType, targetCount = (3 + level / 5).coerceAtMost(16)))
+                val counts = (baseCount + level / 4).coerceAtMost(16)
+                goals.add(LevelGoal(isBlocker = true, blockerType = gType, targetCount = counts))
             }
         }
 
-        // Procedural obstacles grid placements (Difficulty progression!)
+        // Procedural obstacles grid placements (SUMMON EXACTLY target goal counts from starting!)
         val obstacles = mutableMapOf<Pair<Int, Int>, ObstacleType>()
-        if (level > 5 && !isBossBattle) {
-            val count = (3 + rand.nextInt((level / 3 + 4).coerceAtMost(18))).coerceAtMost(22)
-            for (i in 0 until count) {
-                val r = rand.nextInt(8)
-                val c = rand.nextInt(8)
-                if (r > 1) { // Avoid top rows
-                    val oType = when {
-                        level < 10 -> ObstacleType.CRATE
-                        level < 20 -> listOf(ObstacleType.CRATE, ObstacleType.ICE).random(rand)
-                        level < 30 -> listOf(ObstacleType.CRATE, ObstacleType.ICE, ObstacleType.BARREL).random(rand)
-                        level < 40 -> listOf(ObstacleType.CRATE, ObstacleType.ICE, ObstacleType.BARREL, ObstacleType.HONEY).random(rand)
-                        level < 50 -> listOf(ObstacleType.CRATE, ObstacleType.ICE, ObstacleType.BARREL, ObstacleType.HONEY, ObstacleType.CHAIN).random(rand)
-                        level < 65 -> listOf(ObstacleType.ICE, ObstacleType.BARREL, ObstacleType.HONEY, ObstacleType.CHAIN, ObstacleType.CRYSTAL_CAGE).random(rand)
-                        else -> listOf(ObstacleType.ICE, ObstacleType.BARREL, ObstacleType.HONEY, ObstacleType.CHAIN, ObstacleType.CRYSTAL_CAGE, ObstacleType.CHOCOLATE).random(rand)
-                    }
-                    obstacles[Pair(r, c)] = oType
-                }
+        
+        // Find safe positions on rows 2 to 7 to place our goals so they are accessible and do not block top spawning
+        val eligibleCells = mutableListOf<Pair<Int, Int>>()
+        for (r in 2 until 8) {
+            for (c in 0 until 8) {
+                eligibleCells.add(Pair(r, c))
             }
-        } else if (isBossBattle) {
-            // Boss battles have intense themed obstacle patterns
-            val bossTypeNum = (level / 100) % 10
-            // Place 10 obstacles matching the boss layout
-            for (row in 4..7) {
-                for (col in 1..6) {
-                    if ((row + col) % 3 == 0) {
-                        val oType = when (bossTypeNum) {
-                            1 -> ObstacleType.CHOCOLATE // Chocolate Titan
-                            2 -> ObstacleType.ICE       // Frostbite Queen
-                            3 -> ObstacleType.CRATE     // Lollipop Dragon
-                            4 -> ObstacleType.CHAIN     // Cookie Golem
-                            else -> ObstacleType.CRATE
-                        }
-                        obstacles[Pair(row, col)] = oType
-                    }
+        }
+        eligibleCells.shuffle(rand)
+
+        var placedIndex = 0
+        for (goal in goals) {
+            val countToPlace = goal.targetCount
+            for (i in 0 until countToPlace) {
+                if (placedIndex < eligibleCells.size) {
+                    val cell = eligibleCells[placedIndex++]
+                    obstacles[cell] = goal.blockerType
                 }
             }
         }
@@ -179,9 +189,18 @@ object LevelGenerator {
 data class MatchResult(
     val matchesFound: List<Pair<Int, Int>>,
     val specialCreated: Map<Pair<Int, Int>, Pair<CandyType, CandySpecial>>,
-    val clearedObstacles: List<Pair<Int, Int>>,
+    val clearedObstacles: List<Pair<Pair<Int, Int>, ObstacleType>>,
     val pointsScored: Long,
-    val damageToBoss: Long
+    val damageToBoss: Long,
+    val explodedCandies: List<CandyItem> = emptyList(),
+    val damagedObstacles: List<Pair<Pair<Int, Int>, ObstacleType>> = emptyList(),
+    val launchedSpinners: List<Pair<Int, Int>> = emptyList(),
+    val detonatedTNTs: List<Pair<Int, Int>> = emptyList()
+)
+
+data class HammerResult(
+    val candy: CandyItem?,
+    val obstacle: ObstacleType?
 )
 
 class Match3Engine(private val config: LevelConfig) {
@@ -210,10 +229,18 @@ class Match3Engine(private val config: LevelConfig) {
 
     fun getInitialDurability(type: ObstacleType): Int {
         return when (type) {
-            ObstacleType.BARREL -> 4
-            ObstacleType.ICE -> 3
-            ObstacleType.CRYSTAL_CAGE -> 3
-            ObstacleType.HONEY -> 3
+            ObstacleType.CRATE -> 3       // Wooden Crate has 3 layers (1 chain overlay + 2 wooden boxes)
+            ObstacleType.STONE -> 3       // Stone Block has 3 layers 
+            ObstacleType.ICE -> 2         // Ice Block has 2 layers
+            ObstacleType.CHAIN -> 1       // Chain needs 1 hit to break
+            ObstacleType.MAGIC_BARRIER -> 3 // Magic Barrier has 3 layers
+            ObstacleType.CHOCOLATE -> 1   // Chocolate has 1 layer
+            ObstacleType.APPLE -> 1       // Apples are collectable with 1 adjacent hit!
+            ObstacleType.CROWN -> 1       // Crowns collectable with 1 adjacent hit
+            ObstacleType.SHIELD -> 1      // Shields collectable with 1 adjacent hit
+            ObstacleType.CRYSTAL -> 2     // Crystals have 2 layers
+            ObstacleType.EGGS -> 2        // Eggs have 2 layers
+            ObstacleType.BEE_HIVE -> 3    // Beehive HP is 3
             else -> 1
         }
     }
@@ -225,7 +252,23 @@ class Match3Engine(private val config: LevelConfig) {
             nextId = 1L
             for (r in 0 until rows) {
                 for (c in 0 until cols) {
-                    board[r][c] = generateRandomCandy(r, c, rand)
+                    val obs = obstacles[Pair(r, c)] ?: ObstacleType.NONE
+                    val isSolidBlocker = obs in listOf(
+                        ObstacleType.CRATE,
+                        ObstacleType.STONE,
+                        ObstacleType.MAGIC_BARRIER,
+                        ObstacleType.APPLE,
+                        ObstacleType.CROWN,
+                        ObstacleType.SHIELD,
+                        ObstacleType.CRYSTAL,
+                        ObstacleType.EGGS,
+                        ObstacleType.BEE_HIVE
+                    )
+                    if (isSolidBlocker) {
+                        board[r][c] = null
+                    } else {
+                        board[r][c] = generateRandomCandy(r, c, rand)
+                    }
                 }
             }
         } while (hasMatchesOnBoard())
@@ -280,9 +323,10 @@ class Match3Engine(private val config: LevelConfig) {
         // Check adjacency
         if (abs(r1 - r2) + abs(c1 - c2) != 1) return false
 
-        // Check if locked in chains
-        if (obstacles[Pair(r1, c1)] == ObstacleType.CHAIN || obstacles[Pair(r2, c2)] == ObstacleType.CHAIN) {
-            return false // Locked!
+        // Check if locked in blockers of any type!
+        if ((obstacles[Pair(r1, c1)] ?: ObstacleType.NONE) != ObstacleType.NONE ||
+            (obstacles[Pair(r2, c2)] ?: ObstacleType.NONE) != ObstacleType.NONE) {
+            return false // Swapping is locked for ANY active blocker!
         }
 
         val temp = board[r1][c1]
@@ -302,10 +346,32 @@ class Match3Engine(private val config: LevelConfig) {
     fun processMatchesAndCollapse(): MatchResult {
         val matchedCells = mutableSetOf<Pair<Int, Int>>()
         val specialCandidates = mutableMapOf<Pair<Int, Int>, Pair<CandyType, CandySpecial>>()
-        val clearedBlocks = mutableListOf<Pair<Int, Int>>()
+        val clearedBlocks = mutableListOf<Pair<Pair<Int, Int>, ObstacleType>>()
         
         var pointsGained = 0L
         var bossDamageDealt = 0L
+
+        // Scan 2x2 Square Matches
+        for (r in 0 until rows - 1) {
+            for (c in 0 until cols - 1) {
+                val t = board[r][c]?.type
+                if (t != null && t != CandyType.COLOR_BOMB) {
+                    if (board[r+1][c]?.type == t && board[r][c+1]?.type == t && board[r+1][c+1]?.type == t) {
+                        val b00 = obstacles[Pair(r, c)] ?: ObstacleType.NONE
+                        val b10 = obstacles[Pair(r+1, c)] ?: ObstacleType.NONE
+                        val b01 = obstacles[Pair(r, c+1)] ?: ObstacleType.NONE
+                        val b11 = obstacles[Pair(r+1, c+1)] ?: ObstacleType.NONE
+                        if (b00 == ObstacleType.NONE && b10 == ObstacleType.NONE && b01 == ObstacleType.NONE && b11 == ObstacleType.NONE) {
+                            val sqCells = listOf(Pair(r, c), Pair(r+1, c), Pair(r, c+1), Pair(r+1, c+1))
+                            matchedCells.addAll(sqCells)
+                            specialCandidates[Pair(r, c)] = Pair(t, CandySpecial.SPINNER)
+                            pointsGained += 400
+                            bossDamageDealt += 40
+                        }
+                    }
+                }
+            }
+        }
 
         // Scan Horizontal Matches
         for (r in 0 until rows) {
@@ -318,18 +384,14 @@ class Match3Engine(private val config: LevelConfig) {
                         matchLength++
                     }
                     if (matchLength >= 3) {
-                        // Mark match cells
                         val lineCells = (c until c + matchLength).map { Pair(r, it) }
                         matchedCells.addAll(lineCells)
 
-                        // Special candy creation logic!
                         if (matchLength == 4) {
-                            // Striped candy
                             val targetIndex = lineCells[1]
-                            specialCandidates[targetIndex] = Pair(currentType, CandySpecial.STRIPED_HORIZONTAL)
+                            specialCandidates[targetIndex] = Pair(currentType, CandySpecial.SPINNER)
                             pointsGained += 500
                         } else if (matchLength >= 5) {
-                            // Color Bomb
                             val targetIndex = lineCells[2]
                             specialCandidates[targetIndex] = Pair(CandyType.COLOR_BOMB, CandySpecial.NONE)
                             pointsGained += 1000
@@ -364,10 +426,9 @@ class Match3Engine(private val config: LevelConfig) {
 
                         if (matchLength == 4) {
                             val targetIndex = lineCells[1]
-                            specialCandidates[targetIndex] = Pair(currentType, CandySpecial.STRIPED_VERTICAL)
+                            specialCandidates[targetIndex] = Pair(currentType, CandySpecial.SPINNER)
                             pointsGained += 500
                         } else if (matchLength >= 5) {
-                            // Color Bomb
                             val targetIndex = lineCells[2]
                             specialCandidates[targetIndex] = Pair(CandyType.COLOR_BOMB, CandySpecial.NONE)
                             pointsGained += 1000
@@ -386,8 +447,7 @@ class Match3Engine(private val config: LevelConfig) {
             }
         }
 
-        // Detect T-shape or L-Shape matches for WRAPPED candy creation
-        // A cell is a candidate if it belongs to both vertical and horizontal match lines
+        // Detect T-shape or L-Shape matches for TNT candy creation
         val intersections = matchedCells.filter { cell ->
             val hasHorizMatchedNeighbors = matchedCells.contains(Pair(cell.first, cell.second - 1)) &&
                     matchedCells.contains(Pair(cell.first, cell.second + 1))
@@ -398,7 +458,7 @@ class Match3Engine(private val config: LevelConfig) {
         if (intersections.isNotEmpty()) {
             val target = intersections[0]
             val type = board[target.first][target.second]?.type ?: config.allowedCandyTypes.random()
-            specialCandidates[target] = Pair(type, CandySpecial.WRAPPED)
+            specialCandidates[target] = Pair(type, CandySpecial.TNT)
             pointsGained += 800
             bossDamageDealt += 80
         }
@@ -406,6 +466,8 @@ class Match3Engine(private val config: LevelConfig) {
         // Apply explosion logic of nested specials!
         val cellsToExplode = matchedCells.toMutableList()
         val scannedSpecials = mutableSetOf<Pair<Int, Int>>()
+        val launchedSpinnersList = mutableListOf<Pair<Int, Int>>()
+        val detonatedTNTsList = mutableListOf<Pair<Int, Int>>()
         
         var idx = 0
         while (idx < cellsToExplode.size) {
@@ -414,26 +476,18 @@ class Match3Engine(private val config: LevelConfig) {
             if (candy != null && cell !in scannedSpecials) {
                 scannedSpecials.add(cell)
                 
-                // Explode Striped (clears row/col)
-                if (candy.special == CandySpecial.STRIPED_HORIZONTAL) {
-                    bossDamageDealt += 45
-                    for (colIdx in 0 until cols) {
-                        val otherCell = Pair(cell.first, colIdx)
-                        if (otherCell !in cellsToExplode) cellsToExplode.add(otherCell)
-                    }
-                } else if (candy.special == CandySpecial.STRIPED_VERTICAL) {
-                    bossDamageDealt += 45
-                    for (rowIdx in 0 until rows) {
-                        val otherCell = Pair(rowIdx, cell.second)
-                        if (otherCell !in cellsToExplode) cellsToExplode.add(otherCell)
-                    }
+                // Explode Spinner
+                if (candy.special == CandySpecial.SPINNER) {
+                    bossDamageDealt += 40
+                    launchedSpinnersList.add(cell)
                 }
                 
-                // Explode Wrapped (double 3x3 blast)
-                if (candy.special == CandySpecial.WRAPPED) {
-                    bossDamageDealt += 60
-                    for (dr in -1..1) {
-                        for (dc in -1..1) {
+                // Explode TNT (clears 5x5 zone)
+                if (candy.special == CandySpecial.TNT) {
+                    bossDamageDealt += 65
+                    detonatedTNTsList.add(cell)
+                    for (dr in -2..2) {
+                        for (dc in -2..2) {
                             val targetR = cell.first + dr
                             val targetC = cell.second + dc
                             if (targetR in 0 until rows && targetC in 0 until cols) {
@@ -443,13 +497,35 @@ class Match3Engine(private val config: LevelConfig) {
                         }
                     }
                 }
+
+                // Explode Color Bomb (triggers cascading color clearing)
+                if (candy.type == CandyType.COLOR_BOMB) {
+                    bossDamageDealt += 100
+                    val availableColors = board.flatten().filterNotNull()
+                        .map { it.type }
+                        .filter { it != CandyType.COLOR_BOMB && it != CandyType.CHOCO_BALL }
+                        .distinct()
+                    if (availableColors.isNotEmpty()) {
+                        val chosenColor = availableColors.random(Random.Default)
+                        for (r in 0 until rows) {
+                            for (c in 0 until cols) {
+                                if (board[r][c]?.type == chosenColor) {
+                                    val otherCell = Pair(r, c)
+                                    if (otherCell !in cellsToExplode) {
+                                        cellsToExplode.add(otherCell)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             idx++
         }
 
         // Damage adjacent blockers/obstacles (with layered durability)
+        val damagedBlocks = mutableListOf<Pair<Pair<Int, Int>, ObstacleType>>()
         for (cell in cellsToExplode) {
-            // Check adjacent cells for adjacent-breakable obstacles (CRATE, ICE, BARREL, HONEY)
             for (dr in -1..1) {
                 for (dc in -1..1) {
                     if (abs(dr) + abs(dc) == 1) { // Orthogonal adjacency
@@ -458,9 +534,11 @@ class Match3Engine(private val config: LevelConfig) {
                         if (adjR in 0 until rows && adjC in 0 until cols) {
                             val adjCell = Pair(adjR, adjC)
                             val obsType = obstacles[adjCell] ?: ObstacleType.NONE
-                            if (obsType == ObstacleType.CRATE || obsType == ObstacleType.ICE || 
-                                obsType == ObstacleType.BARREL || obsType == ObstacleType.HONEY) {
-                                damageObstacleAt(adjCell, clearedBlocks)
+                            if (obsType != ObstacleType.NONE && obsType != ObstacleType.CHAIN) {
+                                val isDestroyed = damageObstacleAt(adjCell, clearedBlocks)
+                                if (!isDestroyed) {
+                                    damagedBlocks.add(Pair(adjCell, obsType))
+                                }
                                 pointsGained += 150
                             }
                         }
@@ -468,17 +546,20 @@ class Match3Engine(private val config: LevelConfig) {
                 }
             }
             
-            // Core blocker breaking (CHAIN, CRYSTAL_CAGE)
-            val directObs = obstacles[cell]
-            if (directObs != null) {
-                if (directObs == ObstacleType.CHAIN || directObs == ObstacleType.CRYSTAL_CAGE) {
-                    damageObstacleAt(cell, clearedBlocks)
-                    pointsGained += 200
+            // Core blocker breaking directly on the matched cell (like CHAIN which locks the item itself)
+            val directObs = obstacles[cell] ?: ObstacleType.NONE
+            if (directObs == ObstacleType.CHAIN) {
+                val isDestroyed = damageObstacleAt(cell, clearedBlocks)
+                if (!isDestroyed) {
+                    damagedBlocks.add(Pair(cell, directObs))
                 }
+                pointsGained += 200
             }
         }
 
         // Detonate matching candies and remove them
+        val explodedCandiesList = cellsToExplode.mapNotNull { board[it.first][it.second] }
+
         for (cell in cellsToExplode) {
             board[cell.first][cell.second] = null
         }
@@ -499,7 +580,11 @@ class Match3Engine(private val config: LevelConfig) {
             specialCreated = specialCandidates,
             clearedObstacles = clearedBlocks,
             pointsScored = pointsGained,
-            damageToBoss = bossDamageDealt
+            damageToBoss = bossDamageDealt,
+            explodedCandies = explodedCandiesList,
+            damagedObstacles = damagedBlocks,
+            launchedSpinners = launchedSpinnersList,
+            detonatedTNTs = detonatedTNTsList
         )
     }
 
@@ -553,12 +638,88 @@ class Match3Engine(private val config: LevelConfig) {
         return exploded
     }
 
+    // Swapping Color Bomb with adjacent item detonations
+    fun detonateColorBombSwap(
+        r1: Int, c1: Int,
+        r2: Int, c2: Int,
+        candy1: CandyItem?,
+        candy2: CandyItem?
+    ): MatchResult {
+        val explodedPoints = mutableListOf<Pair<Int, Int>>()
+        val clearedBlocks = mutableListOf<Pair<Pair<Int, Int>, ObstacleType>>()
+        val explodedCandies = mutableListOf<CandyItem>()
+        var pointsGained = 0L
+
+        // Find which is the Color Bomb and which is the target candy color
+        val targetColor: CandyType? = if (candy1?.type == CandyType.COLOR_BOMB) {
+            candy2?.type
+        } else if (candy2?.type == CandyType.COLOR_BOMB) {
+            candy1?.type
+        } else {
+            null
+        }
+
+        // Explode the Color Bomb cells
+        if (candy1?.type == CandyType.COLOR_BOMB) {
+            explodedPoints.add(Pair(r1, c1))
+            explodedCandies.add(candy1)
+            board[r1][c1] = null
+        }
+        if (candy2?.type == CandyType.COLOR_BOMB) {
+            explodedPoints.add(Pair(r2, c2))
+            explodedCandies.add(candy2)
+            board[r2][c2] = null
+        }
+
+        // Clear target candies on the entire board
+        if (targetColor != null) {
+            for (r in 0 until rows) {
+                for (c in 0 until cols) {
+                    val tile = board[r][c]
+                    if (tile?.type == targetColor) {
+                        explodedPoints.add(Pair(r, c))
+                        explodedCandies.add(tile)
+                        board[r][c] = null
+                        pointsGained += 200
+                    }
+                }
+            }
+        } else {
+            // Both are color bombs! Trigger full-board clear of candies
+            for (r in 0 until rows) {
+                for (c in 0 until cols) {
+                    val tile = board[r][c]
+                    if (tile != null) {
+                        explodedPoints.add(Pair(r, c))
+                        explodedCandies.add(tile)
+                        board[r][c] = null
+                        pointsGained += 150
+                    }
+                }
+            }
+        }
+
+        return MatchResult(
+            matchesFound = explodedPoints,
+            specialCreated = emptyMap(),
+            clearedObstacles = clearedBlocks,
+            pointsScored = pointsGained,
+            damageToBoss = pointsGained / 10,
+            explodedCandies = explodedCandies
+        )
+    }
+
     // Trigger Hammer booster
-    fun useHammerBooster(r: Int, c: Int): Boolean {
-        if (r !in 0 until rows || c !in 0 until cols) return false
+    fun useHammerBooster(r: Int, c: Int): HammerResult {
+        if (r !in 0 until rows || c !in 0 until cols) return HammerResult(null, null)
+        val candy = board[r][c]
+        val obstacle = obstacles[Pair(r, c)]
+        
         board[r][c] = null
         obstacles.remove(Pair(r, c))
-        return true
+        obstacleDurability.remove(Pair(r, c))
+        
+        return HammerResult(candy, obstacle)
     }
 
     // Chocolate expansion spread logic at end of turn if NO matches were made
@@ -592,28 +753,77 @@ class Match3Engine(private val config: LevelConfig) {
         return emptyList()
     }
 
-    private fun damageObstacleAt(cell: Pair<Int, Int>, clearedBlocks: MutableList<Pair<Int, Int>>) {
-        val currentType = obstacles[cell] ?: return
+    fun damageCellDirect(r: Int, c: Int): MatchResult {
+        val explodedPoints = mutableListOf<Pair<Int, Int>>()
+        val clearedBlocks = mutableListOf<Pair<Pair<Int, Int>, ObstacleType>>()
+        val explodedCandies = mutableListOf<CandyItem>()
+        var pointsGained = 0L
+        
+        val cell = Pair(r, c)
+        if (r in 0 until rows && c in 0 until cols) {
+            val candy = board[r][c]
+            if (candy != null) {
+                board[r][c] = null
+                explodedPoints.add(cell)
+                explodedCandies.add(candy)
+                pointsGained += 100L
+            }
+            
+            if (obstacles.containsKey(cell)) {
+                damageObstacleAt(cell, clearedBlocks)
+                pointsGained += 200L
+            }
+        }
+        
+        return MatchResult(
+            matchesFound = explodedPoints,
+            specialCreated = emptyMap(),
+            clearedObstacles = clearedBlocks,
+            pointsScored = pointsGained,
+            damageToBoss = pointsGained / 10,
+            explodedCandies = explodedCandies
+        )
+    }
+
+    private fun damageObstacleAt(cell: Pair<Int, Int>, clearedBlocks: MutableList<Pair<Pair<Int, Int>, ObstacleType>>): Boolean {
+        val currentType = obstacles[cell] ?: return false
         val currentDur = obstacleDurability[cell] ?: 1
         val nextDur = currentDur - 1
         
         if (nextDur <= 0) {
             obstacles.remove(cell)
             obstacleDurability.remove(cell)
-            clearedBlocks.add(cell)
+            clearedBlocks.add(Pair(cell, currentType))
             
-            // Satisfying synthesized breaking sound effects
+            // Play physical destruction sound effects
             when (currentType) {
-                ObstacleType.ICE -> SoundManager.playSweepTone(800.0, 1100.0, 140, 0.45f)
-                ObstacleType.BARREL -> SoundManager.playSweepTone(300.0, 90.0, 220, 0.55f)
-                ObstacleType.CRYSTAL_CAGE -> SoundManager.playSweepTone(950.0, 1900.0, 280, 0.5f)
-                ObstacleType.HONEY -> SoundManager.playSweepTone(450.0, 180.0, 190, 0.45f)
+                ObstacleType.CRATE -> SoundManager.playWoodBreak()
+                ObstacleType.STONE -> SoundManager.playStoneBreak()
+                ObstacleType.ICE -> SoundManager.playIceBreak()
+                ObstacleType.CHAIN -> SoundManager.playChainBreak()
+                ObstacleType.MAGIC_BARRIER -> SoundManager.playMagicBreak()
+                ObstacleType.APPLE, ObstacleType.CROWN, ObstacleType.SHIELD -> SoundManager.playGoalChime()
                 else -> SoundManager.playMatch3Pop()
             }
+            return true
         } else {
             obstacleDurability[cell] = nextDur
-            // Progressive denting sound click!
-            SoundManager.playTone(380.0 + (nextDur * 100.0), 90, 0.38f)
+            // Play hit sounds based on obstacle type and current layers
+            when (currentType) {
+                ObstacleType.CRATE -> {
+                    if (currentDur == 3) {
+                        SoundManager.playChainBreak()
+                    } else {
+                        SoundManager.playWoodHit()
+                    }
+                }
+                ObstacleType.STONE -> SoundManager.playStoneHit()
+                ObstacleType.ICE -> SoundManager.playIceHit()
+                ObstacleType.CHAIN -> SoundManager.playChainHit()
+                ObstacleType.MAGIC_BARRIER -> SoundManager.playMagicHit()
+                else -> SoundManager.playSoftClick()
+            }
+            return false
         }
     }
 

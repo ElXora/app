@@ -9,6 +9,13 @@ import com.example.data.repository.GameRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Job
+import androidx.compose.ui.graphics.Color
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.roundToInt
 
 // Screen states in Candy Kingdom Legends
 sealed class GameScreen {
@@ -38,6 +45,58 @@ data class ExplodingCandy(
     val startTime: Long = System.currentTimeMillis()
 )
 
+// Physical blocker/obstacle hits or destructions event model
+data class ObstacleAnimationEvent(
+    val id: Long,
+    val r: Int,
+    val c: Int,
+    val type: ObstacleType,
+    val isDestroy: Boolean,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+data class LightningArc(
+    val fromR: Int,
+    val fromC: Int,
+    val toR: Int,
+    val toC: Int,
+    val color: Color,
+    val alpha: Float
+)
+
+data class FlyingSpinner(
+    val id: Int,
+    val fromR: Float,
+    val fromC: Float,
+    val toR: Float,
+    val toC: Float,
+    val progress: Float,
+    val rotation: Float,
+    val isBombSpinner: Boolean = false
+)
+
+enum class ParticleShape {
+    CIRCLE,
+    CHIP,
+    SPARKLE,
+    CONFETTI,
+    FLAME,
+    SMOKE
+}
+
+data class BoardParticle(
+    val id: Int,
+    val r: Float,
+    val c: Float,
+    val vx: Float,
+    val vy: Float,
+    val color: Color,
+    val size: Float,
+    val gravity: Float,
+    val alpha: Float,
+    val shape: ParticleShape
+)
+
 // Main ViewModel
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class GameViewModel(application: Application) : AndroidViewModel(application) {
@@ -61,6 +120,195 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _obstacleState = MutableStateFlow<Map<Pair<Int, Int>, ObstacleType>>(emptyMap())
     val obstacleState: StateFlow<Map<Pair<Int, Int>, ObstacleType>> = _obstacleState.asStateFlow()
+
+    private val _obstacleDurabilityState = MutableStateFlow<Map<Pair<Int, Int>, Int>>(emptyMap())
+    val obstacleDurabilityState: StateFlow<Map<Pair<Int, Int>, Int>> = _obstacleDurabilityState.asStateFlow()
+
+    private val _obstacleAnimations = MutableStateFlow<List<ObstacleAnimationEvent>>(emptyList())
+    val obstacleAnimationsState: StateFlow<List<ObstacleAnimationEvent>> = _obstacleAnimations.asStateFlow()
+
+    fun getColorForCandyType(type: CandyType): Color {
+        return when (type) {
+            CandyType.RED_JELLYBEAN -> Color(0xFFFF1744)
+            CandyType.BLUE_GEM -> Color(0xFF00E5FF)
+            CandyType.YELLOW_STAR -> Color(0xFFFFEA00)
+            CandyType.PINK_SWIRL -> Color(0xFFE040FB)
+            CandyType.PURPLE_BERRY -> Color(0xFF9013FE)
+            CandyType.GREEN_CUBE -> Color(0xFF00E676)
+            CandyType.ORANGE_STRIPED -> Color(0xFFFF9100)
+            else -> Color.White
+        }
+    }
+
+    val boardDarkness = MutableStateFlow(0f)
+    val boardFlash = MutableStateFlow(false)
+    val screenShakeOffset = MutableStateFlow(Pair(0f, 0f))
+    val rainbowVortexActive = MutableStateFlow(false)
+    
+    val lightningArcs = MutableStateFlow<List<LightningArc>>(emptyList())
+    val flyingSpinners = MutableStateFlow<List<FlyingSpinner>>(emptyList())
+    val boardParticles = MutableStateFlow<List<BoardParticle>>(emptyList())
+
+    private var particleIdCounter = 0
+    private var animationJob: Job? = null
+
+    fun triggerScreenShake(durationMs: Long, intensity: Float) {
+        viewModelScope.launch {
+            val startTime = System.currentTimeMillis()
+            while (System.currentTimeMillis() - startTime < durationMs) {
+                val dx = ((Math.random() - 0.5) * intensity * 15).toFloat()
+                val dy = ((Math.random() - 0.5) * intensity * 15).toFloat()
+                screenShakeOffset.value = Pair(dx, dy)
+                delay(16)
+            }
+            screenShakeOffset.value = Pair(0f, 0f)
+        }
+    }
+
+    fun spawnParticles(
+        r: Float, c: Float,
+        type: ParticleShape,
+        color: Color = Color.White,
+        count: Int = 12,
+        speedFactor: Float = 1.0f
+    ) {
+        val list = mutableListOf<BoardParticle>()
+        for (i in 0 until count) {
+            val angle = Math.random() * 2 * Math.PI
+            val speed = (Math.random() * 0.12f + 0.04f).toFloat() * speedFactor
+            val vx = (cos(angle) * speed).toFloat()
+            val vy = (sin(angle) * speed).toFloat() - (if (type == ParticleShape.FLAME || type == ParticleShape.SMOKE) 0.03f else 0f)
+            val gravity = when (type) {
+                ParticleShape.FLAME, ParticleShape.SMOKE -> -0.003f
+                ParticleShape.CONFETTI -> 0.002f
+                else -> 0.007f
+            }
+            val sizeVal = when (type) {
+                ParticleShape.SMOKE -> 12f + (Math.random() * 12f).toFloat()
+                ParticleShape.FLAME -> 10f + (Math.random() * 8f).toFloat()
+                else -> 5f + (Math.random() * 6f).toFloat()
+            }
+            list.add(
+                BoardParticle(
+                    id = particleIdCounter++,
+                    r = r,
+                    c = c,
+                    vx = vx,
+                    vy = vy,
+                    color = if (type == ParticleShape.CONFETTI) {
+                        val rainbow = listOf(Color(0xFFE040FB), Color(0xFF00E5FF), Color(0xFFFFEA00), Color(0xFFFF1744), Color(0xFF00E676))
+                        rainbow.random()
+                    } else color,
+                    size = sizeVal,
+                    gravity = gravity,
+                    alpha = 1.0f,
+                    shape = type
+                )
+            )
+        }
+        boardParticles.value = boardParticles.value + list
+        startAnimationLoop()
+    }
+
+    private fun startAnimationLoop() {
+        if (animationJob != null) return
+        animationJob = viewModelScope.launch(Dispatchers.Default) {
+            while (true) {
+                var needsMore = false
+                
+                val spinners = flyingSpinners.value
+                if (spinners.isNotEmpty()) {
+                    needsMore = true
+                    val updated = spinners.map { spinner ->
+                        val nextProgress = (spinner.progress + 0.045f).coerceAtMost(1f)
+                        spinner.copy(
+                            progress = nextProgress,
+                            rotation = spinner.rotation + 25f
+                        )
+                    }
+                    val active = updated.filter { it.progress < 1f }
+                    val finished = updated.filter { it.progress >= 1f }
+                    
+                    withContext(Dispatchers.Main) {
+                        flyingSpinners.value = active
+                        finished.forEach { spinner ->
+                            handleSpinnerLanding(spinner)
+                        }
+                    }
+                }
+                
+                val particles = boardParticles.value
+                if (particles.isNotEmpty()) {
+                    needsMore = true
+                    val updated = particles.map { p ->
+                        p.copy(
+                            r = p.r + p.vy,
+                            c = p.c + p.vx,
+                            vy = p.vy + p.gravity,
+                            alpha = (p.alpha - 0.035f).coerceAtLeast(0f)
+                        )
+                    }.filter { it.alpha > 0f && it.r in -2f..10f && it.c in -2f..10f }
+                    
+                    withContext(Dispatchers.Main) {
+                        boardParticles.value = updated
+                    }
+                }
+                
+                if (!needsMore) {
+                    delay(300)
+                } else {
+                    delay(16)
+                }
+            }
+        }
+    }
+
+    private fun handleSpinnerLanding(spinner: FlyingSpinner) {
+        val tr = spinner.toR.roundToInt().coerceIn(0, 7)
+        val tc = spinner.toC.roundToInt().coerceIn(0, 7)
+        val engine = currentEngine ?: return
+        
+        spawnParticles(tr.toFloat(), tc.toFloat(), ParticleShape.SPARKLE, Color(0xFF00E5FF), count = 10, speedFactor = 1.2f)
+        
+        val res = engine.damageCellDirect(tr, tc)
+        currentScore.value += res.pointsScored
+        updateGoalItems(res.explodedCandies, res.clearedObstacles.map { it.second })
+        _boardState.value = engine.board.map { it.clone() }.toTypedArray()
+        updateObstaclesState(engine)
+        
+        if (isBossBattle.value) {
+            val dmg = res.damageToBoss
+            bossHp.value = (bossHp.value - dmg).coerceAtLeast(0)
+            if (dmg > 0) addFloatingMessage("-$dmg", tr, tc, "#FF1744", isDamage = true)
+        }
+        
+        SoundManager.playMatch3Pop()
+    }
+
+    fun findSpinnerTarget(engine: Match3Engine): Pair<Int, Int> {
+        val obstaclesList = engine.obstacles.keys.toList()
+        if (obstaclesList.isNotEmpty()) {
+            return obstaclesList.random()
+        }
+        
+        val candyCells = mutableListOf<Pair<Int, Int>>()
+        for (r in 0 until 8) {
+            for (c in 0 until 8) {
+                if (engine.board[r][c] != null) {
+                    candyCells.add(Pair(r, c))
+                }
+            }
+        }
+        if (candyCells.isNotEmpty()) {
+            return candyCells.random()
+        }
+        return Pair(4, 4)
+    }
+
+    private fun updateObstaclesState(engine: Match3Engine) {
+        _obstacleState.value = engine.obstacles.toMap()
+        _obstacleDurabilityState.value = engine.obstacleDurability.toMap()
+    }
 
     // Match-3 session metrics State
     val currentLevel = MutableStateFlow(1)
@@ -380,7 +628,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             engine.runTntBombBoost()
             
             _boardState.value = engine.board.map { it.clone() }.toTypedArray()
-            _obstacleState.value = engine.obstacles.toMap()
+            updateObstaclesState(engine)
             addFloatingMessage("TNT BOOM! 💥", 4, 3, "#FF7043")
             delay(320)
             
@@ -403,7 +651,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val cleared = engine.runSpinnerBoost()
             
             _boardState.value = engine.board.map { it.clone() }.toTypedArray()
-            _obstacleState.value = engine.obstacles.toMap()
+            updateObstaclesState(engine)
             if (cleared.isNotEmpty()) {
                 addFloatingMessage("SPINNED TILES! 🌪️", 4, 3, "#26C6DA")
             } else {
@@ -455,7 +703,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val engine = Match3Engine(config)
         currentEngine = engine
         _boardState.value = engine.board.map { it.clone() }.toTypedArray()
-        _obstacleState.value = engine.obstacles.toMap()
+        updateObstaclesState(engine)
 
         _currentScreen.value = GameScreen.Gameplay(level)
     }
@@ -475,7 +723,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Executes swipe action
+    // Executes swipe action (with high-energy Color Bomb swap triggers!)
     fun performSwipeAction(r1: Int, c1: Int, r2: Int, c2: Int) {
         val engine = currentEngine ?: return
         if (isBusy.value || isLevelDone.value || isGameOver.value) return
@@ -483,24 +731,100 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isBusy.value = true
 
+            val candy1 = boardState.value.getOrNull(r1)?.getOrNull(c1)
+            val candy2 = boardState.value.getOrNull(r2)?.getOrNull(c2)
+            val isColorBombSwap = (candy1?.type == CandyType.COLOR_BOMB) || (candy2?.type == CandyType.COLOR_BOMB)
+
             // Swap visual change
             val success = engine.swapCandies(r1, c1, r2, c2)
             if (success) {
                 _boardState.value = engine.board.map { it.clone() }.toTypedArray()
                 delay(180) // swap duration
 
-                // Evaluate matches
-                val matchesMade = processMatchesAndRunCascade()
-                if (matchesMade) {
-                    // Turn finished successfully, decrease move count
+                if (isColorBombSwap) {
+                    val result = engine.detonateColorBombSwap(r1, c1, r2, c2, candy1, candy2)
+                    
+                    // Darken board for Retro Disco effect!
+                    boardDarkness.value = 0.75f
+                    rainbowVortexActive.value = true
+                    
+                    // Add beautiful neon electric lightning arcs!
+                    val centerR = if (candy1?.type == CandyType.COLOR_BOMB) r1 else r2
+                    val centerC = if (candy1?.type == CandyType.COLOR_BOMB) c1 else c2
+                    val targetCells = result.matchesFound.filter { it.first != centerR || it.second != centerC }
+                    
+                    val arcs = targetCells.map { cell ->
+                        LightningArc(
+                            fromR = centerR,
+                            fromC = centerC,
+                            toR = cell.first,
+                            toC = cell.second,
+                            color = listOf(Color(0xFF00E5FF), Color(0xFFFF1744), Color(0xFFFFEA00), Color(0xFFD500F9)).random(),
+                            alpha = 1.0f
+                        )
+                    }
+                    lightningArcs.value = arcs
+                    triggerScreenShake(durationMs = 400, intensity = 1.2f)
+                    
+                    // Delay a bit for the lightning surge
+                    delay(350)
+                    
+                    // Trigger massive sparkles on each target cell!
+                    targetCells.forEach { cell ->
+                        val targetCandy = boardState.value.getOrNull(cell.first)?.getOrNull(cell.second)
+                        val targetColor = if (targetCandy != null) getColorForCandyType(targetCandy.type) else Color.White
+                        spawnParticles(cell.first.toFloat(), cell.second.toFloat(), ParticleShape.SPARKLE, targetColor, count = 8, speedFactor = 1.2f)
+                    }
+                    
+                    // Reset lightning and darkness
+                    lightningArcs.value = emptyList()
+                    boardDarkness.value = 0f
+                    rainbowVortexActive.value = false
+                    boardFlash.value = true
+                    delay(85)
+                    boardFlash.value = false
+                    
+                    // Add explosive score
+                    currentScore.value += result.pointsScored
+
+                    // Update goals
+                    updateGoalItems(result.explodedCandies, result.clearedObstacles.map { it.second })
+
+                    // Trigger Boss damage mechanics if applicable
+                    if (isBossBattle.value) {
+                        val damage = result.damageToBoss
+                        bossHp.value = (bossHp.value - damage).coerceAtLeast(0)
+                        addFloatingMessage("-$damage", 2, 3, "#FF1744", isDamage = true)
+                    }
+
+                    _boardState.value = engine.board.map { it.clone() }.toTypedArray()
+                    updateObstaclesState(engine)
+
+                    SoundManager.playMatch5Sparkle()
+                    delay(300)
+
                     movesLeft.value = (movesLeft.value - 1).coerceAtLeast(0)
                     evaluateBossAttackStep()
                     checkGameEndConditions()
-                } else {
-                    // Return swap if no match
-                    engine.revertSwap(r1, c1, r2, c2)
+
+                    // Collapse and trigger normal cascading checks!
+                    engine.collapseBoard()
                     _boardState.value = engine.board.map { it.clone() }.toTypedArray()
-                    addFloatingMessage("Locked!", r1, c1, "#FF5252")
+                    processMatchesAndRunCascade()
+                } else {
+                    // Evaluate matches normally
+                    val matchesMade = processMatchesAndRunCascade()
+                    if (matchesMade) {
+                        // Turn finished successfully, decrease move count
+                        movesLeft.value = (movesLeft.value - 1).coerceAtLeast(0)
+                        evaluateBossAttackStep()
+                        checkGameEndConditions()
+                    } else {
+                        // Return swap if no match
+                        engine.revertSwap(r1, c1, r2, c2)
+                        _boardState.value = engine.board.map { it.clone() }.toTypedArray()
+                        addFloatingMessage("Locked!", r1, c1, "#FF5252")
+                    }
                 }
             }
             
@@ -538,13 +862,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 // Deduct booster
                 repository.adjustBooster(user, "hammer", -1)
                 
-                // Break tile
-                engine.useHammerBooster(r, c)
+                // Break tile and fetch destroyed item results (updates goals!)
+                val hammerResult = engine.useHammerBooster(r, c)
                 addFloatingMessage("SMASH!", r, c, "#00E5FF")
                 SoundManager.playTntExplosion()
                 _boardState.value = engine.board.map { it.clone() }.toTypedArray()
-                _obstacleState.value = engine.obstacles.toMap()
+                updateObstaclesState(engine)
                 
+                // Track destroyed items for goals decrement!
+                val listCandies = if (hammerResult.candy != null) listOf(hammerResult.candy) else emptyList()
+                val listObstacles = if (hammerResult.obstacle != null) listOf(hammerResult.obstacle) else emptyList()
+                updateGoalItems(listCandies, listObstacles)
+
                 delay(300)
                 processMatchesAndRunCascade()
             } else {
@@ -564,7 +893,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         while (true) {
             val previousBoard = _boardState.value
             val result = engine.processMatchesAndCollapse()
-            if (result.matchesFound.isNotEmpty() || result.clearedObstacles.isNotEmpty()) {
+            if (result.matchesFound.isNotEmpty() || result.clearedObstacles.isNotEmpty() || result.damagedObstacles.isNotEmpty()) {
                 anyMatchesInSequence = true
 
                 // Save exploding cells for custom particles
@@ -576,17 +905,77 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _explodingCandies.value = explodedList
 
+                // Emit obstacle animation events (hits or destructions)
+                val now = System.currentTimeMillis()
+                val currentAnims = _obstacleAnimations.value.filter { now - it.timestamp < 1200 }
+                val newAnims = (result.clearedObstacles.map {
+                    ObstacleAnimationEvent(
+                        id = kotlin.random.Random.nextLong(),
+                        r = it.first.first,
+                        c = it.first.second,
+                        type = it.second,
+                        isDestroy = true
+                    )
+                } + result.damagedObstacles.map {
+                    ObstacleAnimationEvent(
+                        id = kotlin.random.Random.nextLong(),
+                        r = it.first.first,
+                        c = it.first.second,
+                        type = it.second,
+                        isDestroy = false
+                    )
+                })
+                _obstacleAnimations.value = currentAnims + newAnims
+
+                // SPAWN ADVANCED CANDY DEBRIS PARTICLES (CHIPS/CIRCLES WITH SHADOW SENSATION)
+                explodedList.forEach { candy ->
+                    val cColor = getColorForCandyType(candy.type)
+                    // Spawn a beautiful cluster of particles mimicking fragments falling down!
+                    spawnParticles(
+                        r = candy.r.toFloat(),
+                        c = candy.c.toFloat(),
+                        type = ParticleShape.CHIP,
+                        color = cColor,
+                        count = 6,
+                        speedFactor = 1.0f
+                    )
+                }
+
+                // TRIGGER TNT DETONATIONS (FIRE, SMOKE, SCREEN SHAKE)
+                result.detonatedTNTs.forEach { cell ->
+                    triggerScreenShake(durationMs = 500, intensity = 1.7f)
+                    spawnParticles(cell.first.toFloat(), cell.second.toFloat(), ParticleShape.FLAME, Color(0xFFFF3D00), count = 20, speedFactor = 1.3f)
+                    spawnParticles(cell.first.toFloat(), cell.second.toFloat(), ParticleShape.SMOKE, Color(0xFF78909C), count = 12, speedFactor = 0.9f)
+                    SoundManager.playWrappedExplosion()
+                }
+
+                // LAUNCH AERODYNAMIC WINDSWEPT SPINNERS
+                result.launchedSpinners.forEach { fromCell ->
+                    val targetCell = findSpinnerTarget(engine)
+                    val spinnerId = particleIdCounter++
+                    flyingSpinners.value = flyingSpinners.value + FlyingSpinner(
+                        id = spinnerId,
+                        fromR = fromCell.first.toFloat(),
+                        fromC = fromCell.second.toFloat(),
+                        toR = targetCell.first.toFloat(),
+                        toC = targetCell.second.toFloat(),
+                        progress = 0f,
+                        rotation = 0f
+                    )
+                    SoundManager.playMatch4Burst()
+                }
+
                 // Play real-time candy break sound effects
                 if (result.matchesFound.isNotEmpty()) {
                     val createdSpecials = result.specialCreated.values
                     val hasColorBomb = createdSpecials.any { it.first == CandyType.COLOR_BOMB }
-                    val hasWrapped = createdSpecials.any { it.second == CandySpecial.WRAPPED }
-                    val hasStriped = createdSpecials.any { it.second == CandySpecial.STRIPED_HORIZONTAL || it.second == CandySpecial.STRIPED_VERTICAL }
+                    val hasTNT = createdSpecials.any { it.second == CandySpecial.TNT }
+                    val hasSpinner = createdSpecials.any { it.second == CandySpecial.SPINNER }
                     
                     when {
                         hasColorBomb -> SoundManager.playMatch5Sparkle()
-                        hasWrapped -> SoundManager.playWrappedExplosion()
-                        hasStriped -> SoundManager.playMatch4Burst()
+                        hasTNT -> SoundManager.playWrappedExplosion()
+                        hasSpinner -> SoundManager.playMatch4Burst()
                         else -> {
                             if (cascadeLoopCount > 1) {
                                 SoundManager.playCombosPitchIncrease(cascadeLoopCount)
@@ -603,7 +992,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 currentScore.value += addedScore
 
                 // Update matches goal progress
-                updateGoalItems(result.matchesFound, result.clearedObstacles)
+                updateGoalItems(result.explodedCandies, result.clearedObstacles.map { it.second })
 
                 // Damage math
                 if (isBossBattle.value) {
@@ -641,7 +1030,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
                 // Push match changes
                 _boardState.value = engine.board.map { it.clone() }.toTypedArray()
-                _obstacleState.value = engine.obstacles.toMap()
+                updateObstaclesState(engine)
                 
                 // Keep delay to play nice exploding visual feel
                 delay(380)
@@ -652,7 +1041,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 // Refill collapse slide
                 engine.collapseBoard()
                 _boardState.value = engine.board.map { it.clone() }.toTypedArray()
-                _obstacleState.value = engine.obstacles.toMap()
+                updateObstaclesState(engine)
                 
                 delay(280) // tumble delay
                 cascadeLoopCount++
@@ -665,7 +1054,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (!anyMatchesInSequence && cascadeLoopCount == 1) {
             val spread = engine.spreadChocolateObstacle()
             if (spread.isNotEmpty()) {
-                _obstacleState.value = engine.obstacles.toMap()
+                updateObstaclesState(engine)
                 val target = spread.first()
                 addFloatingMessage("Choco Spread!", target.first, target.second, "#7D5233")
             }
@@ -674,22 +1063,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return anyMatchesInSequence
     }
 
-    private fun updateGoalItems(exploded: List<Pair<Int, Int>>, brokenBlockers: List<Pair<Int, Int>>) {
+    private fun updateGoalItems(explodedCandies: List<CandyItem>, brokenBlockers: List<ObstacleType>) {
         val currentGoals = goalsList.value.map { it.copy() }
-        val engine = currentEngine ?: return
 
         for (goal in currentGoals) {
             // Candy type matching goal
             if (goal.type != null) {
-                val matchedOfThisType = exploded.count { boardState.value[it.first][it.second]?.type == goal.type }
+                val matchedOfThisType = explodedCandies.count { it.type == goal.type }
                 goal.currentCount = (goal.currentCount + matchedOfThisType).coerceAtMost(goal.targetCount)
             }
             // Blocker goal matching
             if (goal.isBlocker) {
-                val brokenCount = brokenBlockers.count { cell ->
-                    val obstacleBefore = engine.obstacles[cell]
-                    obstacleBefore == goal.blockerType
-                }
+                val brokenCount = brokenBlockers.count { it == goal.blockerType }
                 goal.currentCount = (goal.currentCount + brokenCount).coerceAtMost(goal.targetCount)
             }
             // Score type goal (for boss fights)
@@ -747,7 +1132,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 addFloatingMessage("Blocked!", cell.first, cell.second, "#CFD8DC")
             }
 
-            _obstacleState.value = engine.obstacles.toMap()
+            updateObstaclesState(engine)
             delay(100)
         }
     }

@@ -3,6 +3,8 @@ package com.example.ui.game
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.content.Context
+import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -11,6 +13,12 @@ import kotlin.math.sin
 object SoundManager {
     var musicEnabled = true
     var sfxEnabled = true
+
+    private var appContext: Context? = null
+
+    fun initialize(context: Context) {
+        appContext = context.applicationContext
+    }
 
     fun playTone(frequency: Double, durationMs: Int, volume: Float = 0.4f) {
         if (!sfxEnabled) return
@@ -33,7 +41,7 @@ object SoundManager {
                     samples[i] = (sin(angle) * volume * envelope).toFloat()
                 }
                 
-                val audioTrack = AudioTrack.Builder()
+                val builder = AudioTrack.Builder()
                     .setAudioAttributes(
                         AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_GAME)
@@ -49,7 +57,8 @@ object SoundManager {
                     )
                     .setBufferSizeInBytes(samples.size * 4)
                     .setTransferMode(AudioTrack.MODE_STATIC)
-                    .build()
+
+                val audioTrack = builder.build()
                 
                 audioTrack.write(samples, 0, samples.size, AudioTrack.WRITE_NON_BLOCKING)
                 audioTrack.play()
@@ -84,7 +93,7 @@ object SoundManager {
                     samples[i] = (sin(angle) * volume * envelope).toFloat()
                 }
                 
-                val audioTrack = AudioTrack.Builder()
+                val builder = AudioTrack.Builder()
                     .setAudioAttributes(
                         AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_GAME)
@@ -100,7 +109,8 @@ object SoundManager {
                     )
                     .setBufferSizeInBytes(samples.size * 4)
                     .setTransferMode(AudioTrack.MODE_STATIC)
-                    .build()
+
+                val audioTrack = builder.build()
                 
                 audioTrack.write(samples, 0, samples.size, AudioTrack.WRITE_NON_BLOCKING)
                 audioTrack.play()
@@ -116,6 +126,76 @@ object SoundManager {
 
     fun playMatch3Pop() {
         playTone(950.0, 80, 0.45f)
+    }
+
+    fun playWoodHit() {
+        playTone(320.0, 90, 0.45f)
+    }
+
+    fun playWoodBreak() {
+        GlobalScope.launch {
+            playTone(280.0, 100, 0.5f)
+            kotlinx.coroutines.delay(40)
+            playSweepTone(200.0, 80.0, 150, 0.55f)
+        }
+    }
+
+    fun playStoneHit() {
+        playTone(180.0, 110, 0.52f)
+    }
+
+    fun playStoneBreak() {
+        GlobalScope.launch {
+            playTone(150.0, 140, 0.6f)
+            kotlinx.coroutines.delay(50)
+            playSweepTone(140.0, 40.0, 280, 0.65f)
+        }
+    }
+
+    fun playIceHit() {
+        playTone(1100.0, 60, 0.42f)
+    }
+
+    fun playIceBreak() {
+        GlobalScope.launch {
+            playTone(1250.0, 80, 0.45f)
+            kotlinx.coroutines.delay(30)
+            playSweepTone(1400.0, 800.0, 200, 0.5f)
+        }
+    }
+
+    fun playChainHit() {
+        playTone(850.0, 70, 0.38f)
+    }
+
+    fun playChainBreak() {
+        GlobalScope.launch {
+            playTone(920.0, 60, 0.42f)
+            kotlinx.coroutines.delay(40)
+            playSweepTone(880.0, 1600.0, 150, 0.45f)
+        }
+    }
+
+    fun playMagicHit() {
+        playSweepTone(450.0, 650.0, 110, 0.4f)
+    }
+
+    fun playMagicBreak() {
+        GlobalScope.launch {
+            playSweepTone(700.0, 300.0, 160, 0.48f)
+            kotlinx.coroutines.delay(50)
+            playSweepTone(280.0, 950.0, 250, 0.5f)
+        }
+    }
+
+    fun playGoalChime() {
+        GlobalScope.launch {
+            playTone(880.00, 60, 0.38f)
+            kotlinx.coroutines.delay(50)
+            playTone(1109.73, 60, 0.42f)
+            kotlinx.coroutines.delay(50)
+            playTone(1318.51, 120, 0.45f)
+        }
     }
 
     fun playMatch4Burst() {
