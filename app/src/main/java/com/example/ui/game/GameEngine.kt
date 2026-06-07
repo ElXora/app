@@ -478,13 +478,13 @@ class Match3Engine(private val config: LevelConfig) {
                 
                 // Explode Spinner
                 if (candy.special == CandySpecial.SPINNER) {
-                    bossDamageDealt += 40
+                    bossDamageDealt += 50
                     launchedSpinnersList.add(cell)
                 }
                 
                 // Explode TNT (clears 5x5 zone)
                 if (candy.special == CandySpecial.TNT) {
-                    bossDamageDealt += 65
+                    bossDamageDealt += 150
                     detonatedTNTsList.add(cell)
                     for (dr in -2..2) {
                         for (dc in -2..2) {
@@ -500,7 +500,7 @@ class Match3Engine(private val config: LevelConfig) {
 
                 // Explode Color Bomb (triggers cascading color clearing)
                 if (candy.type == CandyType.COLOR_BOMB) {
-                    bossDamageDealt += 100
+                    bossDamageDealt += 300
                     val availableColors = board.flatten().filterNotNull()
                         .map { it.type }
                         .filter { it != CandyType.COLOR_BOMB && it != CandyType.CHOCO_BALL }
@@ -573,6 +573,13 @@ class Match3Engine(private val config: LevelConfig) {
                 special = special,
                 isNew = true
             )
+        }
+
+        // Incorporate cleared blockers & crowns into boss damage
+        // Collect Crowns = 50 HP, Destroy Blockers = 25 HP
+        for (tuple in clearedBlocks) {
+            val obsType = tuple.second
+            bossDamageDealt += if (obsType == ObstacleType.CROWN) 50 else 25
         }
 
         return MatchResult(

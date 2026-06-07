@@ -50,6 +50,15 @@ enum class BossCinematic {
     OUTRO_STAR_REVEAL
 }
 
+enum class BossActivity {
+    IDLE,
+    ROAR,
+    LAUGH,
+    STOMP,
+    TAUNT,
+    WEAPON_SLAM
+}
+
 // Sparkle/Floating Combat text animations model
 data class FloatingText(
     val id: Long,
@@ -171,6 +180,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     // Boss fight cinematic sequence states
     val bossCinematicState = MutableStateFlow<BossCinematic?>(null)
+
+    // Boss custom idle/taunt activity systems
+    val bossActivityState = MutableStateFlow<BossActivity>(BossActivity.IDLE)
+    val bossSpeechBubble = MutableStateFlow<String?>(null)
 
     // Pre-level booster select states
     val selectedPreLevel = MutableStateFlow<Int?>(null)
@@ -823,6 +836,72 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+
+        // Periodic Boss custom activity / taunts loop (Every 7 seconds)
+        viewModelScope.launch {
+            while (true) {
+                delay(7000)
+                val isGameplay = currentScreen.value is GameScreen.Gameplay && !isBusy.value && !isLevelDone.value && !isGameOver.value
+                val isBoss = isBossBattle.value && bossCinematicState.value == null
+                if (isGameplay && isBoss) {
+                    val activities = listOf(
+                        BossActivity.ROAR,
+                        BossActivity.LAUGH,
+                        BossActivity.STOMP,
+                        BossActivity.TAUNT,
+                        BossActivity.WEAPON_SLAM
+                    )
+                    val chosen = activities.random()
+                    bossActivityState.value = chosen
+                    
+                    val phase = bossPhase.value
+                    val tauntText = when (chosen) {
+                        BossActivity.ROAR -> {
+                            SoundManager.playBossRoar()
+                            triggerScreenShake(durationMs = 700, intensity = 2.0f)
+                            if (phase == 3) {
+                                "RAAAAAWR! LEVEL YOUR BOARD TO ASHES! 😡🔥"
+                            } else {
+                                "RAAAAAWWRR! THE SEVEN CANDY KINGDOMS TREMBLE! 🦖⚡"
+                            }
+                        }
+                        BossActivity.LAUGH -> {
+                            SoundManager.playMatch5Sparkle()
+                            if (phase == 3) {
+                                "Mwahahaha! My absolute rage is boiling! You have no escape! 😈🌋"
+                            } else {
+                                "Mwahahaha! Your little candies tickle my giant armor! 😂🍬"
+                            }
+                        }
+                        BossActivity.STOMP -> {
+                            SoundManager.playMatch4Burst()
+                            triggerScreenShake(durationMs = 500, intensity = 1.6f)
+                            spawnParticles(1.5f, 3.5f, ParticleShape.SMOKE, Color.DarkGray, count = 18, speedFactor = 0.9f)
+                            "STOMP! Fear the colossal weight of the Candy Golem! 💥"
+                        }
+                        BossActivity.TAUNT -> {
+                            "Is that the best match you can conjure? Pitiful mortal! 👋🥱"
+                        }
+                        BossActivity.WEAPON_SLAM -> {
+                            SoundManager.playMatch4Burst()
+                            triggerScreenShake(durationMs = 600, intensity = 1.8f)
+                            spawnParticles(1.5f, 3.5f, ParticleShape.CHIP, Color(0xFF5D4037), count = 20, speedFactor = 1.1f)
+                            "CRASH!! Feel the impact of my Royal Chocolate Mace! 🔨🍫"
+                        }
+                        else -> null
+                    }
+                    bossSpeechBubble.value = tauntText
+                    
+                    // Let the active animation state & text play for 3 seconds, then return to IDLE
+                    delay(3000)
+                    bossActivityState.value = BossActivity.IDLE
+                    bossSpeechBubble.value = null
+                } else {
+                    bossActivityState.value = BossActivity.IDLE
+                    bossSpeechBubble.value = null
+                }
+            }
+        }
     }
 
     private fun getMockEmoji(idx: Int): String {
@@ -1001,11 +1080,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val r = (3..4).random()
             val c = (3..4).random()
             engine.board[r][c] = CandyItem(id = (100000L..999999L).random(), type = CandyType.COLOR_BOMB, special = CandySpecial.NONE, isNew = true)
+            sessionDupeCount.value = 0
         }
         if (sessionTntCount.value > 0) {
             val r = (2..5).random()
             val c = (2..5).random()
             engine.board[r][c] = CandyItem(id = (100000L..999999L).random(), type = engine.board[r][c]?.type ?: CandyType.RED_JELLYBEAN, special = CandySpecial.TNT, isNew = true)
+            sessionTntCount.value = 0
         }
         if (sessionSpinnerCount.value > 0) {
             viewModelScope.launch {
@@ -1026,6 +1107,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     SoundManager.playMatch4Burst()
                     delay(300)
                 }
+                sessionSpinnerCount.value = 0
             }
         }
 

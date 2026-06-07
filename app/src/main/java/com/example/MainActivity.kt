@@ -19,17 +19,11 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
 
-    // Initialize SoundManager with attribution context
+    // Initialize SoundManager
     com.example.ui.game.SoundManager.initialize(this)
 
-    val baseContextWithAttribution = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        createAttributionContext("default")
-    } else {
-        this
-    }
-
     // Initialize notification system
-    GameNotificationManager.createNotificationChannel(baseContextWithAttribution)
+    GameNotificationManager.createNotificationChannel(this)
 
     // Request notification permissions for Android 13+ (Tiramisu)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -50,20 +44,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onStop() {
     super.onStop()
-    val baseContextWithAttribution = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        createAttributionContext("default")
-    } else {
-        this
-    }
     // Trigger local reminder notification to play when app minimizes
-    GameNotificationManager.triggerPlayReminderNotification(baseContextWithAttribution)
-  }
-
-  override fun getAttributionTag(): String? {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-      "default"
-    } else {
-      super.getAttributionTag()
-    }
+    GameNotificationManager.triggerPlayReminderNotification(this)
   }
 }

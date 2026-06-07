@@ -52,6 +52,8 @@ import com.example.R
 import com.example.data.AppDatabase
 import com.example.data.model.PlayerState
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.ui.platform.LocalDensity
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalAnimationApi::class)
@@ -341,51 +343,10 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Large Hero banner with game logo
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(260.dp),
-                shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
-            ) {
-                Box {
-                    Image(
-                        painter = painterResource(id = R.drawable.img_app_icon),
-                        contentDescription = "Candy Kingdom Hero Banner",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    // Glass filter overlay
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
-                                )
-                            )
-                    )
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.Bottom
-                    ) {
-                        Text(
-                            text = "Candy Kingdom",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Welcome back, ${state.username}! 🍬 Let's crush sweet goals.",
-                            fontSize = 13.sp,
-                            color = Color.White.copy(alpha = 0.82f)
-                        )
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 3D Isometric Kingdom Builder Canvas!
+            IsometricKingdomCanvas(viewModel = viewModel, state = state)
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -419,27 +380,33 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Current Adventure Button
+            // Premium Level Badge Button - Play current level and prompt initial boosters selection
             Button(
-                onClick = { viewModel.navigateTo(GameScreen.Map) },
+                onClick = { viewModel.selectedPreLevel.value = state.currentLevel },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp)
-                    .testTag("play_button"),
+                    .height(68.dp)
+                    .testTag("play_button")
+                    .border(3.dp, Color(0xFFFFD54F), RoundedCornerShape(34.dp)),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF00E676)
                 ),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(34.dp),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
             ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(28.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "PLAY ADVENTURE",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text("👑", fontSize = 24.sp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "PLAY LEVEL ${state.currentLevel}",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -539,6 +506,379 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
         }
 
         LiveEventAnnouncementBanner(viewModel)
+    }
+}
+
+@Composable
+fun IsometricKingdomCanvas(
+    viewModel: GameViewModel,
+    state: PlayerState,
+    modifier: Modifier = Modifier
+) {
+    val buildings by viewModel.buildingLevels.collectAsState()
+    val kingdomLvl by viewModel.kingdomLevel.collectAsState()
+    
+    // Dynamic timer for rotating windmills, spouting water and sparkling stars!
+    var animationTime by remember { mutableStateOf(0f) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(16)
+            animationTime += 0.05f
+        }
+    }
+    
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(340.dp)
+            .border(2.dp, Color(0xFFFFD54F), RoundedCornerShape(24.dp)),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF16092C)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+    ) {
+        androidx.compose.foundation.layout.BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val localDensity = LocalDensity.current
+            val widthPx = with(localDensity) { maxWidth.toPx() }
+            val heightPx = with(localDensity) { maxHeight.toPx() }
+            val cx = widthPx / 2f
+            val cy = heightPx / 2f + with(localDensity) { 40.dp.toPx() }
+            
+            // Isometric project functions
+            fun project(x: Float, y: Float, z: Float): Offset {
+                // X axis = 30 deg, Y axis = 150 deg down-pointing
+                val px = cx + (x - y) * 0.866f
+                val py = cy + (x + y) * 0.5f - z
+                return Offset(px, py)
+            }
+            
+            fun drawIsoPrism(
+                x: Float, y: Float, z: Float,
+                dx: Float, dy: Float, dz: Float,
+                topColor: Color, leftColor: Color, rightColor: Color,
+                canvasDrawScope: androidx.compose.ui.graphics.drawscope.DrawScope
+            ) {
+                val p1 = project(x, y, z)
+                val p2 = project(x + dx, y, z)
+                val p3 = project(x + dx, y + dy, z)
+                val p4 = project(x, y + dy, z)
+                
+                val p5 = project(x, y, z + dz)
+                val p6 = project(x + dx, y, z + dz)
+                val p7 = project(x + dx, y + dy, z + dz)
+                val p8 = project(x, y + dy, z + dz)
+                
+                // Left
+                val leftPath = Path().apply {
+                    moveTo(p1.x, p1.y)
+                    lineTo(p4.x, p4.y)
+                    lineTo(p8.x, p8.y)
+                    lineTo(p5.x, p5.y)
+                    close()
+                }
+                canvasDrawScope.drawPath(leftPath, leftColor)
+                
+                // Right
+                val rightPath = Path().apply {
+                    moveTo(p1.x, p1.y)
+                    lineTo(p2.x, p2.y)
+                    lineTo(p6.x, p6.y)
+                    lineTo(p5.x, p5.y)
+                    close()
+                }
+                canvasDrawScope.drawPath(rightPath, rightColor)
+                
+                // Top
+                val topPath = Path().apply {
+                    moveTo(p5.x, p5.y)
+                    lineTo(p6.x, p6.y)
+                    lineTo(p7.x, p7.y)
+                    lineTo(p8.x, p8.y)
+                    close()
+                }
+                canvasDrawScope.drawPath(topPath, topColor)
+            }
+            
+            // Draw 2D custom Canvas
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                // 1. Splash background moat
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFF00B0FF), Color(0xFF0D47A1)),
+                        center = Offset(cx, cy),
+                        radius = 210.dp.toPx()
+                    ),
+                    radius = 180.dp.toPx(),
+                    center = Offset(cx, cy)
+                )
+                
+                // Ripples
+                for (i in 0 until 3) {
+                    val waveRadius = ((100 + i * 40 + (animationTime * 15f) % 40) % 180).dp.toPx()
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.08f),
+                        radius = waveRadius,
+                        center = Offset(cx, cy),
+                        style = Stroke(width = 2.dp.toPx())
+                    )
+                }
+                
+                // 2. Green meadow island
+                val mPath = Path().apply {
+                    val scale = 140.dp.toPx()
+                    moveTo(cx, cy - scale * 0.5f)
+                    lineTo(cx + scale * 0.866f, cy - scale * 0.25f)
+                    lineTo(cx + scale * 0.866f, cy + scale * 0.25f)
+                    lineTo(cx, cy + scale * 0.5f)
+                    lineTo(cx - scale * 0.866f, cy + scale * 0.25f)
+                    lineTo(cx - scale * 0.866f, cy - scale * 0.25f)
+                    close()
+                }
+                val dPath = Path().apply {
+                    val scale = 140.dp.toPx()
+                    val th = 12.dp.toPx()
+                    moveTo(cx - scale * 0.866f, cy + scale * 0.25f)
+                    lineTo(cx, cy + scale * 0.5f)
+                    lineTo(cx + scale * 0.866f, cy + scale * 0.25f)
+                    lineTo(cx + scale * 0.866f, cy + scale * 0.25f + th)
+                    lineTo(cx, cy + scale * 0.5f + th)
+                    lineTo(cx - scale * 0.866f, cy + scale * 0.25f + th)
+                    close()
+                }
+                drawPath(dPath, Color(0xFF5E35B1))
+                drawPath(mPath, Color(0xFF4CAF50))
+                
+                // Paths crossing
+                val path1 = Path().apply {
+                    val po1 = project(-100f, 0f, 0f)
+                    val po2 = project(100f, 0f, 0f)
+                    moveTo(po1.x, po1.y)
+                    lineTo(po2.x, po2.y)
+                }
+                drawPath(path1, Color(0xFFE0E0E0).copy(alpha = 0.35f), style = Stroke(width = 12f))
+                
+                // 3. Buildings
+                // A. Castle Keep (Central deep)
+                val castleLvl = buildings["castle"] ?: 0
+                if (castleLvl > 0) {
+                    val ch = 35f + castleLvl * 10f
+                    drawIsoPrism(-30f, -30f, 0f, 50f, 50f, ch, 
+                        if (castleLvl == 5) Color(0xFFFFD54F) else Color(0xFFB0BEC5), 
+                        if (castleLvl == 5) Color(0xFFF57F17) else Color(0xFF78909C), 
+                        if (castleLvl == 5) Color(0xFFFFB300) else Color(0xFF90A4AE), 
+                        this
+                    )
+                    
+                    // Left defender tower
+                    drawIsoPrism(-42f, -10f, 0f, 15f, 15f, ch + 15f, Color(0xFFCFD8DC), Color(0xFF546E7A), Color(0xFF78909C), this)
+                    // Right defender tower
+                    drawIsoPrism(-10f, -42f, 0f, 15f, 15f, ch + 15f, Color(0xFFCFD8DC), Color(0xFF546E7A), Color(0xFF78909C), this)
+                    
+                    // Conical roof
+                    val rPeakL = project(-34.5f, -2.5f, ch + 30f)
+                    val rBaseL1 = project(-42f, -10f, ch + 15f)
+                    val rBaseL2 = project(-27f, -10f, ch + 15f)
+                    val roofPathL = Path().apply {
+                        moveTo(rPeakL.x, rPeakL.y)
+                        lineTo(rBaseL1.x, rBaseL1.y)
+                        lineTo(rBaseL2.x, rBaseL2.y)
+                        close()
+                    }
+                    drawPath(roofPathL, Color(0xFFEF5350))
+                    
+                    // Castle flag
+                    val flagStaffBottom = project(-5f, -5f, ch)
+                    val flagStaffTop = project(-5f, -5f, ch + 28f)
+                    drawLine(color = Color.White, start = flagStaffBottom, end = flagStaffTop, strokeWidth = 4f)
+                    
+                    val fWave = sin(animationTime * 2.5f) * 10f
+                    val flagPath = Path().apply {
+                        moveTo(flagStaffTop.x, flagStaffTop.y)
+                        lineTo(flagStaffTop.x + 22f, flagStaffTop.y + 6f + fWave)
+                        lineTo(flagStaffTop.x + 18f, flagStaffTop.y + 15f + fWave)
+                        lineTo(flagStaffTop.x, flagStaffTop.y + 10f)
+                        close()
+                    }
+                    drawPath(flagPath, if (castleLvl == 5) Color(0xFFFFD54F) else Color(0xFFE91E63))
+                }
+                
+                // B. Mill (Left)
+                val millLvl = buildings["mill"] ?: 0
+                if (millLvl > 0) {
+                    val mh = 30f + millLvl * 8f
+                    drawIsoPrism(-90f, 15f, 0f, 35f, 35f, mh, Color(0xFFA1887F), Color(0xFF6D4C41), Color(0xFF8D6E63), this)
+                    
+                    // Windmill roof peak pyramid
+                    val roofPeak = project(-72.5f, 32.5f, mh + 20f)
+                    val rb2 = project(-55f, 15f, mh)
+                    val rb3 = project(-55f, 50f, mh)
+                    val roofPath = Path().apply {
+                        moveTo(roofPeak.x, roofPeak.y)
+                        lineTo(rb2.x, rb2.y)
+                        lineTo(rb3.x, rb3.y)
+                        close()
+                    }
+                    drawPath(roofPath, Color(0xFF4E342E))
+                    
+                    // Spinning vane blades
+                    val centerRot = project(-55f, 32.5f, mh - 10f)
+                    val bladeL = 36f + millLvl * 4f
+                    val rotateAngle = animationTime * 30f
+                    for (bIdx in 0 until 4) {
+                        val ang = rotateAngle + bIdx * 90f
+                        val rad = Math.toRadians(ang.toDouble())
+                        val endX = centerRot.x + (cos(rad) * bladeL).toFloat()
+                        val endY = centerRot.y + (sin(rad) * bladeL).toFloat()
+                        drawLine(color = Color(0xFFD7CCC8), start = centerRot, end = Offset(endX, endY), strokeWidth = 4f)
+                        
+                        val fPath = Path().apply {
+                            val fAng = Math.toRadians((ang + 15f).toDouble())
+                            val fx1 = centerRot.x + (cos(rad) * bladeL * 0.4f).toFloat()
+                            val fy1 = centerRot.y + (sin(rad) * bladeL * 0.4f).toFloat()
+                            val fx2 = endX
+                            val fy2 = endY
+                            val fx3 = endX + (cos(fAng) * 11f).toFloat()
+                            val fy3 = endY + (sin(fAng) * 11f).toFloat()
+                            val fx4 = fx1 + (cos(fAng) * 11f).toFloat()
+                            val fy4 = fy1 + (sin(fAng) * 11f).toFloat()
+                            moveTo(fx1, fy1)
+                            lineTo(fx2, fy2)
+                            lineTo(fx3, fy3)
+                            lineTo(fx4, fy4)
+                            close()
+                        }
+                        drawPath(fPath, Color.White.copy(alpha = 0.85f))
+                    }
+                    drawCircle(color = Color(0xFF3E2723), radius = 5f, center = centerRot)
+                }
+                
+                // C. Gardens (Right)
+                val gardenLvl = buildings["garden"] ?: 0
+                if (gardenLvl > 0) {
+                    val gColors = listOf(Color(0xFFE91E63), Color(0xFFFFEB3B), Color(0xFF00FF66))
+                    for (i in 0 until gardenLvl) {
+                        val gx = 25f + i * 16f
+                        val gy = -80f + i * 11f
+                        drawIsoPrism(gx, gy, 0f, 12f, 12f, 8f, Color(0xFF2E7D32), Color(0xFF1B5E20), Color(0xFF388E3C), this)
+                        
+                        val flowCent = project(gx + 6f, gy + 6f, 9f)
+                        drawCircle(color = gColors[i % gColors.size], radius = 3.5f, center = flowCent)
+                    }
+                }
+                
+                // D. Fountain (Front deep)
+                val fountainLvl = buildings["fountain"] ?: 0
+                if (fountainLvl > 0) {
+                    val fCent = project(40f, 40f, 0f)
+                    drawCircle(color = Color(0xFFE0E0E0), radius = 20f, center = fCent)
+                    drawCircle(color = Color(0xFFBDBDBD), radius = 20f, center = fCent, style = Stroke(width = 3.dp.toPx()))
+                    drawCircle(color = Color(0xFF00E5FF).copy(alpha = 0.45f), radius = 17f, center = fCent)
+                    
+                    val sHeight = (10f + sin(animationTime * 4.5f) * 8f).coerceAtLeast(3f)
+                    val spoutTop = project(40f, 40f, sHeight)
+                    val spoutBottom = project(40f, 40f, 1f)
+                    drawLine(color = Color(0xFFE0F7FA), start = spoutBottom, end = spoutTop, strokeWidth = 4f)
+                }
+                
+                // E. Golden Sugar Statue (Left front side)
+                val statueLvl = buildings["statue"] ?: 0
+                if (statueLvl > 0) {
+                    drawIsoPrism(-45f, 70f, 0f, 14f, 14f, 16f, Color(0xFFECEFF1), Color(0xFF90A4AE), Color(0xFFB0BEC5), this)
+                    
+                    val floatH = 24f + sin(animationTime * 1.8f) * 3f
+                    val stCent = project(-38f, 77f, floatH)
+                    drawCircle(color = Color(0xFFFFD54F), radius = 7f, center = stCent)
+                    
+                    for (s in 0 until 4) {
+                        val spAng = s * 90f + animationTime * 15f
+                        val rad = Math.toRadians(spAng.toDouble())
+                        val spX = stCent.x + (cos(rad) * 11f).toFloat()
+                        val spY = stCent.y + (sin(rad) * 11f).toFloat()
+                        drawCircle(color = Color(0xFFFFEA00), radius = 1.8f, center = Offset(spX, spY))
+                    }
+                }
+            }
+            
+            // Render floating upgrade buttons
+            val project2D = { x: Float, y: Float, z: Float ->
+                val px = cx + (x - y) * 0.866f
+                val py = cy + (x + y) * 0.5f - z
+                Offset(px, py)
+            }
+            
+            val buildingConfigs = listOf(
+                Triple("castle", "Castle Keep", project2D(-5f, -5f, 60f + (buildings["castle"] ?: 0) * 12f)),
+                Triple("mill", "Glory Mill", project2D(-72.5f, 32.5f, 38f)),
+                Triple("garden", "Gardens", project2D(35f, -70f, 15f)),
+                Triple("fountain", "Fountain", project2D(40f, 40f, 18f)),
+                Triple("statue", "Statue", project2D(-38f, 77f, 26f))
+            )
+            
+            for (bc in buildingConfigs) {
+                val bKey = bc.first
+                val pOffset = bc.third
+                
+                val currentLvl = buildings[bKey] ?: 0
+                val px = with(localDensity) { pOffset.x.toDp() }
+                val py = with(localDensity) { pOffset.y.toDp() }
+                
+                val price = when (currentLvl) {
+                    0 -> 300
+                    1 -> 500
+                    2 -> 800
+                    3 -> 1200
+                    else -> 2000
+                }
+                val isMax = currentLvl >= 5
+                
+                Box(
+                    modifier = Modifier
+                        .offset(x = px - 45.dp, y = py - 18.dp)
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .size(width = 90.dp, height = 34.dp)
+                            .border(
+                                width = 1.dp,
+                                color = if (isMax) Color(0xFFFFD54F) else Color.White.copy(alpha = 0.4f),
+                                shape = RoundedCornerShape(17.dp)
+                            )
+                            .clickable { viewModel.upgradeBuilding(bKey) },
+                        shape = RoundedCornerShape(17.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isMax) Color(0xFFC2185B) else if (state.coins >= price) Color(0xFF00E676) else Color(0xFF5D4037)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            if (isMax) {
+                                Text(
+                                    text = "🏆 MAX",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            } else {
+                                Text(
+                                    text = if (currentLvl == 0) "BUILD" else "LV $currentLvl 🔨",
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "🪙 $price",
+                                    color = Color(0xFFFFD54F),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -964,6 +1304,8 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
     val bPhase by viewModel.bossPhase.collectAsState()
     val bAttackCountdown by viewModel.bossAttackCountdown.collectAsState()
     val cinematicState by viewModel.bossCinematicState.collectAsState()
+    val bActivity by viewModel.bossActivityState.collectAsState()
+    val bSpeech by viewModel.bossSpeechBubble.collectAsState()
     val hintCandies by viewModel.hintHighlightCandies.collectAsState()
 
     // Popups
@@ -974,19 +1316,27 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
     var selectedCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = if (isBoss) {
-                        listOf(Color(0xFF3E1F47), Color(0xFF1F122B), Color(0xFF0E0715))
-                    } else {
-                        listOf(Color(0xFF145374), Color(0xFF003049), Color(0xFF000814))
-                    }
-                )
-            )
+        modifier = Modifier.fillMaxSize()
     ) {
-        DecorativeBackgroundPattern()
+        Image(
+            painter = painterResource(id = R.drawable.img_game_background),
+            contentDescription = "Game Background",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = if (isBoss) {
+                            listOf(Color(0xFF3E1F47).copy(alpha = 0.5f), Color(0xFF0E0715).copy(alpha = 0.85f))
+                        } else {
+                            listOf(Color(0xFF145374).copy(alpha = 0.4f), Color(0xFF000814).copy(alpha = 0.82f))
+                        }
+                    )
+                )
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1091,7 +1441,16 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
 
             // Epically Interactive BOSS ENCOUNTER BAR (Milestones check)
             if (isBoss) {
-                BossArenaPanel(bName, bHp, bMax, bPhase, bAttackCountdown, cinematicState)
+                BossArenaPanel(
+                    name = bName,
+                    hp = bHp,
+                    maxHp = bMax,
+                    phase = bPhase,
+                    countdown = bAttackCountdown,
+                    cinematicState = cinematicState,
+                    activity = bActivity,
+                    speech = bSpeech
+                )
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
@@ -1294,10 +1653,68 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                                 val sx = (spin.fromC + (spin.toC - spin.fromC) * spin.progress) * w + w / 2f
                                 val sy = (spin.fromR + (spin.toR - spin.fromR) * spin.progress) * h + h / 2f
                                 
-                                val radiusScale = 22.dp.toPx()
+                                val altitude = sin(spin.progress * Math.PI).toFloat() // peak in center of flight
+                                val radiusScale = 22.dp.toPx() * (1f + altitude * 0.4f)
                                 val spinRot = spin.rotation
                                 
-                                // Aerodynamic triple dynamic wings
+                                // 1. Draw Altitude Shadow
+                                val shadowOffset = Offset(12f + altitude * 14f, 15f + altitude * 16f)
+                                val shadowX = sx + shadowOffset.x
+                                val shadowY = sy + shadowOffset.y
+                                
+                                rotate(spinRot, Offset(shadowX, shadowY)) {
+                                    for (i in 0 until 3) {
+                                        val angle = i * 120f
+                                        val rad = Math.toRadians(angle.toDouble())
+                                        val wl = radiusScale * 0.9f
+                                        val ww = radiusScale * 0.35f
+                                        
+                                        val wp = Path().apply {
+                                            moveTo(shadowX, shadowY)
+                                            val lx = shadowX + (cos(rad) * wl * 0.4f).toFloat() - (sin(rad) * ww * 0.5f).toFloat()
+                                            val ly = shadowY + (sin(rad) * wl * 0.4f).toFloat() + (cos(rad) * ww * 0.5f).toFloat()
+                                            val tx = shadowX + (cos(rad) * wl).toFloat()
+                                            val ty = shadowY + (sin(rad) * wl).toFloat()
+                                            val rx = shadowX + (cos(rad) * wl * 0.7f).toFloat() + (sin(rad) * ww * 0.3f).toFloat()
+                                            val ry = shadowY + (sin(rad) * wl * 0.7f).toFloat() - (cos(rad) * ww * 0.3f).toFloat()
+                                            
+                                            lineTo(lx, ly)
+                                            quadraticTo(tx - (sin(rad)*5f).toFloat(), ty + (cos(rad)*5f).toFloat(), tx, ty)
+                                            quadraticTo(rx, ry, shadowX, shadowY)
+                                            close()
+                                        }
+                                        drawPath(wp, Color.Black.copy(alpha = 0.22f - altitude * 0.08f))
+                                    }
+                                }
+                                
+                                // 2. Draw TNT Payload if it is a bomb spinner!
+                                if (spin.isBombSpinner) {
+                                    val bWidth = radiusScale * 0.7f
+                                    val bHeight = radiusScale * 0.9f
+                                    drawRect(
+                                        color = Color(0xFFD50000), // Red
+                                        topLeft = Offset(sx - bWidth / 2f, sy - bHeight / 2f),
+                                        size = Size(bWidth, bHeight)
+                                    )
+                                    // Yellow band
+                                    drawRect(
+                                        color = Color(0xFFFFD54F),
+                                        topLeft = Offset(sx - bWidth / 2f, sy - bHeight * 0.35f),
+                                        size = Size(bWidth, bHeight * 0.1f)
+                                    )
+                                    drawRect(
+                                        color = Color(0xFFFFD54F),
+                                        topLeft = Offset(sx - bWidth / 2f, sy + bHeight * 0.25f),
+                                        size = Size(bWidth, bHeight * 0.1f)
+                                    )
+                                    drawCircle(
+                                        color = Color(0xFF1A1A1A),
+                                        radius = bWidth * 0.12f,
+                                        center = Offset(sx, sy)
+                                    )
+                                }
+                                
+                                // 3. Draw Actual propeller spinner wings
                                 rotate(spinRot, Offset(sx, sy)) {
                                     for (i in 0 until 3) {
                                         val angle = i * 120f
@@ -1505,7 +1922,9 @@ fun BossArenaPanel(
     maxHp: Long,
     phase: Int,
     countdown: Int,
-    cinematicState: BossCinematic? = null
+    cinematicState: BossCinematic? = null,
+    activity: BossActivity = BossActivity.IDLE,
+    speech: String? = null
 ) {
     Card(
         modifier = Modifier
@@ -1521,8 +1940,40 @@ fun BossArenaPanel(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Drawn animated Giant Boss character on the Left
-            GiantCandyBossCharacter(phase = phase, hp = hp, cinematicState = cinematicState)
+            // Box enclosing the Boss character and speech bubble
+            Box(
+                contentAlignment = Alignment.BottomCenter,
+                modifier = Modifier.size(width = 75.dp, height = 90.dp)
+            ) {
+                // Drawn animated Giant Boss character on the Left
+                GiantCandyBossCharacter(
+                    phase = phase,
+                    hp = hp,
+                    cinematicState = cinematicState,
+                    activity = activity
+                )
+                
+                // Speech Bubble!
+                if (!speech.isNullOrEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .offset(y = (-5).dp)
+                            .background(Color(0xFF33083E), RoundedCornerShape(8.dp))
+                            .border(1.5.dp, Color(0xFFFFD54F), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = speech,
+                            color = Color.White,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black,
+                            lineHeight = 10.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
             
             Spacer(modifier = Modifier.width(12.dp))
             
@@ -1538,9 +1989,9 @@ fun BossArenaPanel(
                         Text(text = "👑 $name", fontSize = 14.sp, color = Color(0xFFFF1744), fontWeight = FontWeight.Black)
                         Text(
                             text = when (phase) {
-                                3 -> "Rage Phase 3"
-                                2 -> "Agile Phase 2"
-                                else -> "Standard Phase 1"
+                                3 -> "Rage Phase 3 😡"
+                                2 -> "Agile Phase 2 ⚡"
+                                else -> "Standard Phase 1 🛡️"
                             },
                             fontSize = 11.sp,
                             color = Color(0xFFFFD54F),
@@ -1561,6 +2012,11 @@ fun BossArenaPanel(
                     animationSpec = tween(500, easing = FastOutSlowInEasing),
                     label = "boss_hp_deplete"
                 )
+                val animatedDelayedRatio by animateFloatAsState(
+                    targetValue = hpRatio,
+                    animationSpec = tween(1200, easing = androidx.compose.animation.core.LinearOutSlowInEasing),
+                    label = "boss_hp_delayed"
+                )
                 val hpColor = when {
                     hpRatio <= 0.3f -> Color.Red
                     hpRatio <= 0.7f -> Color(0xFFFF9100)
@@ -1570,17 +2026,26 @@ fun BossArenaPanel(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(14.dp)
-                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(7.dp))
+                        .height(16.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
                         .padding(2.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
+                            .fillMaxWidth(animatedDelayedRatio)
+                            .background(
+                                Brush.linearGradient(listOf(Color(0xFFFFD54F).copy(alpha = 0.8f), Color(0xFFFF1744))),
+                                RoundedCornerShape(6.dp)
+                            )
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
                             .fillMaxWidth(animatedRatio)
                             .background(
-                                Brush.linearGradient(listOf(hpColor.copy(alpha = 0.7f), hpColor)),
-                                RoundedCornerShape(5.dp)
+                                Brush.linearGradient(listOf(hpColor.copy(alpha = 0.75f), hpColor)),
+                                RoundedCornerShape(6.dp)
                             )
                     )
                 }
@@ -1597,14 +2062,22 @@ fun BossArenaPanel(
 }
 
 @Composable
-fun GiantCandyBossCharacter(phase: Int, hp: Long, cinematicState: BossCinematic?) {
+fun GiantCandyBossCharacter(
+    phase: Int,
+    hp: Long,
+    cinematicState: BossCinematic?,
+    activity: BossActivity = BossActivity.IDLE
+) {
     // Dynamic animations based on phase and cinematic states
     val infiniteTransition = rememberInfiniteTransition(label = "boss_movement")
+    
+    // Smooth idle bounces & breaths
+    val bounceSpeed = if (activity == BossActivity.LAUGH) 600 else if (phase == 3) 800 else 1200
     val idleOffsetY by infiniteTransition.animateFloat(
         initialValue = -5f,
         targetValue = 5f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
+            animation = tween(bounceSpeed, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "bounce"
@@ -1617,6 +2090,44 @@ fun GiantCandyBossCharacter(phase: Int, hp: Long, cinematicState: BossCinematic?
             repeatMode = RepeatMode.Reverse
         ),
         label = "breathe"
+    )
+
+    // Cape movement swaying
+    val capeSwayAngle by infiniteTransition.animateFloat(
+        initialValue = -10f,
+        targetValue = 10f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "cape_sway"
+    )
+
+    // Weapon swaying
+    val maceSwayAngle by infiniteTransition.animateFloat(
+        initialValue = -15f,
+        targetValue = 15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "mace_sway"
+    )
+
+    // Auto eye-blink animation
+    val blinkScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 3500
+                1f at 0
+                1f at 3300
+                0.05f at 3400 // rapid eye shut
+                1f at 3500
+            }
+        ),
+        label = "blink_scale"
     )
 
     // Cinematic custom positions / scaling
@@ -1636,14 +2147,26 @@ fun GiantCandyBossCharacter(phase: Int, hp: Long, cinematicState: BossCinematic?
         BossCinematic.OUTRO_DEATH_ROAR -> 15f
         BossCinematic.OUTRO_COLLAPSE -> 90f
         BossCinematic.OUTRO_BREAKING -> -30f
-        else -> 0f
+        else -> {
+            when (activity) {
+                BossActivity.TAUNT -> if (idleOffsetY > 0) 6f else -6f
+                BossActivity.WEAPON_SLAM -> -15f
+                else -> 0f
+            }
+        }
     }
 
     val finalOffsetY = idleOffsetY + when (cinematicState) {
         BossCinematic.INTRO_JUMP -> -20f
         BossCinematic.INTRO_IMPACT -> 15f
         BossCinematic.OUTRO_COLLAPSE -> 30f
-        else -> 0f
+        else -> {
+            when (activity) {
+                BossActivity.STOMP -> if (idleOffsetY > 0) 12f else -8f
+                BossActivity.WEAPON_SLAM -> 10f
+                else -> 0f
+            }
+        }
     }
 
     Box(
@@ -1658,9 +2181,37 @@ fun GiantCandyBossCharacter(phase: Int, hp: Long, cinematicState: BossCinematic?
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2, size.height / 2)
-            val baseRadius = size.width * 0.38f
+            val baseRadius = size.width * 0.35f
 
-            // 1. Draw a delicious, jelly, candy monster body (with custom gradients based on phase!)
+            // 1. Draw Cape behind the monster
+            rotate(degrees = capeSwayAngle, pivot = center) {
+                val capePath = Path().apply {
+                    moveTo(center.x - baseRadius * 0.5f, center.y + baseRadius * 0.2f)
+                    lineTo(center.x - baseRadius * 1.5f, center.y + baseRadius * 1.6f)
+                    lineTo(center.x + baseRadius * 1.5f, center.y + baseRadius * 1.6f)
+                    lineTo(center.x + baseRadius * 0.5f, center.y + baseRadius * 0.2f)
+                    close()
+                }
+                drawPath(
+                    path = capePath,
+                    brush = Brush.linearGradient(
+                        listOf(Color(0xFF880E4F), Color(0xFF31001A))
+                    )
+                )
+            }
+
+            // 2. Rage aura if phase == 3
+            if (phase == 3) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.Red.copy(alpha = 0.45f), Color.Transparent)
+                    ),
+                    radius = baseRadius * 1.6f,
+                    center = center
+                )
+            }
+
+            // 3. Draw jelly candy monster body
             val bodyColor = when (phase) {
                 3 -> Color(0xFFD50000) // Fierce Red for Rage Phase 3
                 2 -> Color(0xFFFF9100) // Orange/Amber for Agile Phase 2
@@ -1690,7 +2241,7 @@ fun GiantCandyBossCharacter(phase: Int, hp: Long, cinematicState: BossCinematic?
                 center = center - Offset(baseRadius * 0.3f, baseRadius * 0.3f)
             )
 
-            // 2. Giant horns
+            // 4. Giant horns
             val hornPath = Path().apply {
                 moveTo(center.x - baseRadius * 0.6f, center.y - baseRadius * 0.6f)
                 quadraticTo(
@@ -1711,19 +2262,56 @@ fun GiantCandyBossCharacter(phase: Int, hp: Long, cinematicState: BossCinematic?
             }
             drawPath(rightHornPath, color = Color(0xFFFFEA00))
 
-            // 3. Funny expressive cartoon eyes
+            // 5. Draw Royal Mace weapon to the side of the boss
+            rotate(degrees = maceSwayAngle, pivot = center + Offset(baseRadius * 1.0f, baseRadius * 0.3f)) {
+                // Mace handle
+                drawLine(
+                    color = Color(0xFF795548),
+                    start = center + Offset(baseRadius * 0.9f, baseRadius * 1.2f),
+                    end = center + Offset(baseRadius * 0.9f, -baseRadius * 0.2f),
+                    strokeWidth = 3.dp.toPx()
+                )
+                // Spiked chocolate sphere
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFFFFB300), Color(0xFF3E2723))
+                    ),
+                    radius = baseRadius * 0.35f,
+                    center = center + Offset(baseRadius * 0.9f, -baseRadius * 0.2f)
+                )
+            }
+
+            // 6. Funny expressive cartoon eyes
             val leftEyeCenter = center - Offset(baseRadius * 0.35f, baseRadius * 0.1f)
             val rightEyeCenter = center + Offset(baseRadius * 0.35f, -baseRadius * 0.1f)
 
-            // Sclera
-            drawCircle(color = Color.White, radius = baseRadius * 0.22f, center = leftEyeCenter)
-            drawCircle(color = Color.White, radius = baseRadius * 0.22f, center = rightEyeCenter)
+            // Sclera height scaled by blink state
+            val scleraRadiusX = baseRadius * 0.22f
+            val scleraRadiusY = baseRadius * 0.22f * blinkScale
+
+            // Draw white sclera
+            drawOval(
+                color = Color.White,
+                topLeft = Offset(leftEyeCenter.x - scleraRadiusX, leftEyeCenter.y - scleraRadiusY),
+                size = Size(scleraRadiusX * 2, scleraRadiusY * 2)
+            )
+            drawOval(
+                color = Color.White,
+                topLeft = Offset(rightEyeCenter.x - scleraRadiusX, rightEyeCenter.y - scleraRadiusY),
+                size = Size(scleraRadiusX * 2, scleraRadiusY * 2)
+            )
 
             // Pupils
             val eyeLookOffset = when (cinematicState) {
                 BossCinematic.INTRO_ROAR, BossCinematic.OUTRO_DEATH_ROAR -> Offset(0f, -3f)
                 BossCinematic.OUTRO_COLLAPSE -> Offset(2f, 3f)
-                else -> Offset(0f, 0f)
+                else -> {
+                    when (activity) {
+                        BossActivity.ROAR -> Offset(0f, -4f)
+                        BossActivity.LAUGH -> Offset(1f, 1f)
+                        else -> Offset(0f, 0f)
+                    }
+                }
             }
             drawCircle(color = Color(0xFF120822), radius = baseRadius * 0.11f, center = leftEyeCenter + eyeLookOffset)
             drawCircle(color = Color(0xFF120822), radius = baseRadius * 0.11f, center = rightEyeCenter + eyeLookOffset)
@@ -1732,26 +2320,40 @@ fun GiantCandyBossCharacter(phase: Int, hp: Long, cinematicState: BossCinematic?
             drawCircle(color = Color.White, radius = baseRadius * 0.04f, center = leftEyeCenter + eyeLookOffset - Offset(2f, 2f))
             drawCircle(color = Color.White, radius = baseRadius * 0.04f, center = rightEyeCenter + eyeLookOffset - Offset(2f, 2f))
 
-            // 4. Cheerful/Scary Mouth
+            // 7. Cheerful/Scary Mouth
             val chewingOffset = if (idleOffsetY > 0) baseRadius * 0.08f else 0f
+            val mouthHeightScale = when (activity) {
+                BossActivity.ROAR -> 0.85f
+                BossActivity.LAUGH -> 0.72f
+                else -> if (phase == 3) 0.6f else 0.48f
+            }
+            
             val mouthPath = Path().apply {
                 moveTo(center.x - baseRadius * 0.4f, center.y + baseRadius * 0.2f)
                 quadraticTo(
-                    center.x, center.y + baseRadius * (if (phase == 3) 0.6f else 0.48f) + chewingOffset,
+                    center.x, center.y + baseRadius * mouthHeightScale + chewingOffset,
                     center.x + baseRadius * 0.4f, center.y + baseRadius * 0.2f
                 )
                 close()
             }
-            drawPath(mouthPath, color = Color(0xFF000000).copy(alpha = 0.82f))
+            drawPath(mouthPath, color = Color(0xFF000000).copy(alpha = 0.85f))
 
-            // Fang
-            val toothPath = Path().apply {
-                moveTo(center.x - baseRadius * 0.2f, center.y + baseRadius * 0.21f)
-                lineTo(center.x - baseRadius * 0.1f, center.y + baseRadius * 0.32f)
-                lineTo(center.x, center.y + baseRadius * 0.21f)
+            // Fangs
+            val toothPath1 = Path().apply {
+                moveTo(center.x - baseRadius * 0.25f, center.y + baseRadius * 0.21f)
+                lineTo(center.x - baseRadius * 0.15f, center.y + baseRadius * 0.35f)
+                lineTo(center.x - baseRadius * 0.05f, center.y + baseRadius * 0.21f)
                 close()
             }
-            drawPath(toothPath, color = Color.White)
+            drawPath(toothPath1, color = Color.White)
+
+            val toothPath2 = Path().apply {
+                moveTo(center.x + baseRadius * 0.05f, center.y + baseRadius * 0.21f)
+                lineTo(center.x + baseRadius * 0.15f, center.y + baseRadius * 0.35f)
+                lineTo(center.x + baseRadius * 0.25f, center.y + baseRadius * 0.21f)
+                close()
+            }
+            drawPath(toothPath2, color = Color.White)
         }
     }
 }
