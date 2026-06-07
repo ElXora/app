@@ -670,7 +670,7 @@ fun WorldMapScreen(viewModel: GameViewModel, state: PlayerState) {
                                             shape = CircleShape
                                         )
                                         .clickable(enabled = isUnlocked) {
-                                            viewModel.loadLevel(lvl)
+                                            viewModel.selectedPreLevel.value = lvl
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -713,6 +713,232 @@ fun WorldMapScreen(viewModel: GameViewModel, state: PlayerState) {
                 }
             }
         }
+
+        // Render Pre-level booster select popup on click
+        val selectPreLvl by viewModel.selectedPreLevel.collectAsState()
+        if (selectPreLvl != null) {
+            PreLevelBoosterPopup(viewModel, state, lvlChoice = selectPreLvl!!)
+        }
+    }
+}
+
+// 3.5 PRE-LEVEL BOOSTER POPUP SCREEN
+@Composable
+fun PreLevelBoosterPopup(viewModel: GameViewModel, state: com.example.data.model.PlayerState, lvlChoice: Int) {
+    var dupeChecked by remember { mutableStateOf(false) }
+    var tntChecked by remember { mutableStateOf(false) }
+    var spinnerChecked by remember { mutableStateOf(false) }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = { viewModel.selectedPreLevel.value = null }
+    ) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1035)),
+            border = BorderStroke(2.dp, Color(0xFFFFD54F)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .testTag("pre_level_popup")
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Title
+                Text(
+                    text = "LEVEL $lvlChoice",
+                    color = Color(0xFFFFD54F),
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Battle Preparation",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Objective hint card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF120822)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🎯", fontSize = 24.sp, modifier = Modifier.padding(end = 12.dp))
+                        Column {
+                            Text(
+                                text = "Objective:",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = if (lvlChoice % 10 == 0) "Defeat the Giant Candy Boss!" else "Match candies and clear all barriers!",
+                                color = Color.White.copy(alpha = 0.8f),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = "EQUIP INITIAL BOOSTERS",
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .align(Alignment.Start)
+                        .padding(bottom = 8.dp)
+                )
+
+                // Booster Item Row: Electro Ball
+                val rawDupeCount = state.getBoosterCount("dupe_bomb")
+                BoosterSelectionRow(
+                    title = "Electro Ball ⚡",
+                    description = "Starts with a Color Bomb!",
+                    stock = rawDupeCount,
+                    isSelected = dupeChecked,
+                    onToggle = { dupeChecked = !dupeChecked },
+                    testTag = "pre_equip_dupe"
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Booster Item Row: TNT
+                val rawTntCount = state.getBoosterCount("tnt_bomb")
+                BoosterSelectionRow(
+                    title = "TNT Explosive 💥",
+                    description = "Starts with a TNT explosive!",
+                    stock = rawTntCount,
+                    isSelected = tntChecked,
+                    onToggle = { tntChecked = !tntChecked },
+                    testTag = "pre_equip_tnt"
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Booster Item Row: Spinner
+                val rawSpinnerCount = state.getBoosterCount("spinner")
+                BoosterSelectionRow(
+                    title = "Bomb Spinner 🌪️",
+                    description = "Launches 3 obstacle-clearers!",
+                    stock = rawSpinnerCount,
+                    isSelected = spinnerChecked,
+                    onToggle = { spinnerChecked = !spinnerChecked },
+                    testTag = "pre_equip_spinner"
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Cancel
+                    Button(
+                        onClick = { viewModel.selectedPreLevel.value = null },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cancel", color = Color.White)
+                    }
+
+                    // Start Game!
+                    Button(
+                        onClick = {
+                            viewModel.selectedPreLevel.value = null
+                            viewModel.loadLevelWithBoosters(
+                                level = lvlChoice,
+                                useDupe = dupeChecked,
+                                useTnt = tntChecked,
+                                useSpinner = spinnerChecked
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .testTag("pre_start_button")
+                    ) {
+                        Text("START 🏁", color = Color(0xFF001202), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BoosterSelectionRow(
+    title: String,
+    description: String,
+    stock: Int,
+    isSelected: Boolean,
+    onToggle: () -> Unit,
+    testTag: String
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = if (isSelected) Color(0xFFFFD54F) else Color.White.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable { onToggle() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) Color(0xFF2D164F) else Color(0xFF16092C)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(text = description, color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+            }
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Owned: $stock",
+                    color = if (stock > 0) Color(0xFF00FF66) else Color(0xFFFF1744),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggle() },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = Color(0xFFFFD54F),
+                        uncheckedColor = Color.White.copy(alpha = 0.3f),
+                        checkmarkColor = Color(0xFF1E1035)
+                    ),
+                    modifier = Modifier.testTag(testTag)
+                )
+            }
+        }
     }
 }
 
@@ -737,6 +963,8 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
     val bMax by viewModel.bossMaxHp.collectAsState()
     val bPhase by viewModel.bossPhase.collectAsState()
     val bAttackCountdown by viewModel.bossAttackCountdown.collectAsState()
+    val cinematicState by viewModel.bossCinematicState.collectAsState()
+    val hintCandies by viewModel.hintHighlightCandies.collectAsState()
 
     // Popups
     val isDone by viewModel.isLevelDone.collectAsState()
@@ -863,7 +1091,7 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
 
             // Epically Interactive BOSS ENCOUNTER BAR (Milestones check)
             if (isBoss) {
-                BossArenaPanel(bName, bHp, bMax, bPhase, bAttackCountdown)
+                BossArenaPanel(bName, bHp, bMax, bPhase, bAttackCountdown, cinematicState)
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
@@ -921,6 +1149,7 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                                 obstacleDurability = obstacleDurability,
                                 explodingCandies = explodingCandies,
                                 selectedCell = selectedCell,
+                                hintHighlightCandies = hintCandies,
                                 onCellSelect = { r, c ->
                                     val sel = selectedCell
                                     if (sel == null) {
@@ -1275,7 +1504,8 @@ fun BossArenaPanel(
     hp: Long,
     maxHp: Long,
     phase: Int,
-    countdown: Int
+    countdown: Int,
+    cinematicState: BossCinematic? = null
 ) {
     Card(
         modifier = Modifier
@@ -1285,53 +1515,243 @@ fun BossArenaPanel(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2C1033)),
         border = BorderStroke(2.dp, Color(0xFFFF1744).copy(alpha = 0.6f))
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Name & phase
-                Column {
-                    Text(text = "👑 $name (" + when (phase) {
-                        3 -> "Rage Phase 3"
-                        2 -> "Agile Phase 2"
-                        else -> "Standard Phase 1"
-                    } + ")", fontSize = 14.sp, color = Color(0xFFFF1744), fontWeight = FontWeight.Black)
-                    Text(text = "Mini-blocks after $countdown moves", fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Drawn animated Giant Boss character on the Left
+            GiantCandyBossCharacter(phase = phase, hp = hp, cinematicState = cinematicState)
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            // Health details on the Right
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Name & phase
+                    Column {
+                        Text(text = "👑 $name", fontSize = 14.sp, color = Color(0xFFFF1744), fontWeight = FontWeight.Black)
+                        Text(
+                            text = when (phase) {
+                                3 -> "Rage Phase 3"
+                                2 -> "Agile Phase 2"
+                                else -> "Standard Phase 1"
+                            },
+                            fontSize = 11.sp,
+                            color = Color(0xFFFFD54F),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // hp progress numbers
+                    Text(text = "$hp / $maxHp HP", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.ExtraBold)
                 }
 
-                // hp display
-                Text(text = "$hp / $maxHp HP", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
-            }
+                Spacer(modifier = Modifier.height(6.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
+                // health bar progress (smoothed with dynamic animateFloatAsState!)
+                val hpRatio = (hp.toFloat() / maxHp.toFloat()).coerceIn(0f, 1f)
+                val animatedRatio by animateFloatAsState(
+                    targetValue = hpRatio,
+                    animationSpec = tween(500, easing = FastOutSlowInEasing),
+                    label = "boss_hp_deplete"
+                )
+                val hpColor = when {
+                    hpRatio <= 0.3f -> Color.Red
+                    hpRatio <= 0.7f -> Color(0xFFFF9100)
+                    else -> Color(0xFF00FF66)
+                }
 
-            // health bar progress
-            val hpRatio = (hp.toFloat() / maxHp.toFloat()).coerceIn(0f, 1f)
-            val hpColor = when {
-                hpRatio <= 0.3f -> Color.Red
-                hpRatio <= 0.7f -> Color(0xFFFF9100)
-                else -> Color(0xFF4CAF50)
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(14.dp)
-                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(7.dp))
-                    .padding(2.dp)
-            ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(hpRatio)
-                        .background(
-                            Brush.linearGradient(listOf(hpColor.copy(alpha = 0.7f), hpColor)),
-                            RoundedCornerShape(5.dp)
-                        )
+                        .fillMaxWidth()
+                        .height(14.dp)
+                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(7.dp))
+                        .padding(2.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(animatedRatio)
+                            .background(
+                                Brush.linearGradient(listOf(hpColor.copy(alpha = 0.7f), hpColor)),
+                                RoundedCornerShape(5.dp)
+                            )
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Spawner Attack in $countdown moves",
+                    fontSize = 10.sp,
+                    color = Color.White.copy(alpha = 0.6f)
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun GiantCandyBossCharacter(phase: Int, hp: Long, cinematicState: BossCinematic?) {
+    // Dynamic animations based on phase and cinematic states
+    val infiniteTransition = rememberInfiniteTransition(label = "boss_movement")
+    val idleOffsetY by infiniteTransition.animateFloat(
+        initialValue = -5f,
+        targetValue = 5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bounce"
+    )
+    val breatheScale by infiniteTransition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "breathe"
+    )
+
+    // Cinematic custom positions / scaling
+    val currentScale = when (cinematicState) {
+        BossCinematic.INTRO_START -> 0f
+        BossCinematic.INTRO_JUMP -> 1.5f
+        BossCinematic.INTRO_ROAR -> 1.3f
+        BossCinematic.OUTRO_DEATH_ROAR -> 1.4f
+        BossCinematic.OUTRO_COLLAPSE -> 0.4f
+        BossCinematic.OUTRO_BREAKING -> 0.7f
+        BossCinematic.OUTRO_DISAPPEAR -> 0f
+        else -> 1f
+    } * breatheScale
+
+    val rotationAngle = when (cinematicState) {
+        BossCinematic.INTRO_JUMP -> 360f
+        BossCinematic.OUTRO_DEATH_ROAR -> 15f
+        BossCinematic.OUTRO_COLLAPSE -> 90f
+        BossCinematic.OUTRO_BREAKING -> -30f
+        else -> 0f
+    }
+
+    val finalOffsetY = idleOffsetY + when (cinematicState) {
+        BossCinematic.INTRO_JUMP -> -20f
+        BossCinematic.INTRO_IMPACT -> 15f
+        BossCinematic.OUTRO_COLLAPSE -> 30f
+        else -> 0f
+    }
+
+    Box(
+        modifier = Modifier
+            .size(70.dp)
+            .graphicsLayer(
+                scaleX = currentScale,
+                scaleY = currentScale,
+                rotationZ = rotationAngle,
+                translationY = finalOffsetY
+            )
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2, size.height / 2)
+            val baseRadius = size.width * 0.38f
+
+            // 1. Draw a delicious, jelly, candy monster body (with custom gradients based on phase!)
+            val bodyColor = when (phase) {
+                3 -> Color(0xFFD50000) // Fierce Red for Rage Phase 3
+                2 -> Color(0xFFFF9100) // Orange/Amber for Agile Phase 2
+                else -> Color(0xFFE040FB) // Delicious grape purple for Standard Phase 1
+            }
+
+            // Body drop shadow
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.3f),
+                radius = baseRadius,
+                center = center + Offset(3f, 4f)
+            )
+
+            // Jelly Body gradient
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(bodyColor.copy(alpha = 0.6f), bodyColor)
+                ),
+                radius = baseRadius,
+                center = center
+            )
+
+            // Glisten Highlight
+            drawCircle(
+                color = Color.White.copy(alpha = 0.25f),
+                radius = baseRadius * 0.4f,
+                center = center - Offset(baseRadius * 0.3f, baseRadius * 0.3f)
+            )
+
+            // 2. Giant horns
+            val hornPath = Path().apply {
+                moveTo(center.x - baseRadius * 0.6f, center.y - baseRadius * 0.6f)
+                quadraticTo(
+                    center.x - baseRadius * 1.1f, center.y - baseRadius * 1.4f,
+                    center.x - baseRadius * 0.4f, center.y - baseRadius * 0.9f
+                )
+                close()
+            }
+            drawPath(hornPath, color = Color(0xFFFFEA00)) // Golden star sugar horns!
+
+            val rightHornPath = Path().apply {
+                moveTo(center.x + baseRadius * 0.6f, center.y - baseRadius * 0.6f)
+                quadraticTo(
+                    center.x + baseRadius * 1.1f, center.y - baseRadius * 1.4f,
+                    center.x + baseRadius * 0.4f, center.y - baseRadius * 0.9f
+                )
+                close()
+            }
+            drawPath(rightHornPath, color = Color(0xFFFFEA00))
+
+            // 3. Funny expressive cartoon eyes
+            val leftEyeCenter = center - Offset(baseRadius * 0.35f, baseRadius * 0.1f)
+            val rightEyeCenter = center + Offset(baseRadius * 0.35f, -baseRadius * 0.1f)
+
+            // Sclera
+            drawCircle(color = Color.White, radius = baseRadius * 0.22f, center = leftEyeCenter)
+            drawCircle(color = Color.White, radius = baseRadius * 0.22f, center = rightEyeCenter)
+
+            // Pupils
+            val eyeLookOffset = when (cinematicState) {
+                BossCinematic.INTRO_ROAR, BossCinematic.OUTRO_DEATH_ROAR -> Offset(0f, -3f)
+                BossCinematic.OUTRO_COLLAPSE -> Offset(2f, 3f)
+                else -> Offset(0f, 0f)
+            }
+            drawCircle(color = Color(0xFF120822), radius = baseRadius * 0.11f, center = leftEyeCenter + eyeLookOffset)
+            drawCircle(color = Color(0xFF120822), radius = baseRadius * 0.11f, center = rightEyeCenter + eyeLookOffset)
+
+            // Eye highlights
+            drawCircle(color = Color.White, radius = baseRadius * 0.04f, center = leftEyeCenter + eyeLookOffset - Offset(2f, 2f))
+            drawCircle(color = Color.White, radius = baseRadius * 0.04f, center = rightEyeCenter + eyeLookOffset - Offset(2f, 2f))
+
+            // 4. Cheerful/Scary Mouth
+            val chewingOffset = if (idleOffsetY > 0) baseRadius * 0.08f else 0f
+            val mouthPath = Path().apply {
+                moveTo(center.x - baseRadius * 0.4f, center.y + baseRadius * 0.2f)
+                quadraticTo(
+                    center.x, center.y + baseRadius * (if (phase == 3) 0.6f else 0.48f) + chewingOffset,
+                    center.x + baseRadius * 0.4f, center.y + baseRadius * 0.2f
+                )
+                close()
+            }
+            drawPath(mouthPath, color = Color(0xFF000000).copy(alpha = 0.82f))
+
+            // Fang
+            val toothPath = Path().apply {
+                moveTo(center.x - baseRadius * 0.2f, center.y + baseRadius * 0.21f)
+                lineTo(center.x - baseRadius * 0.1f, center.y + baseRadius * 0.32f)
+                lineTo(center.x, center.y + baseRadius * 0.21f)
+                close()
+            }
+            drawPath(toothPath, color = Color.White)
         }
     }
 }
@@ -1345,8 +1765,21 @@ fun GridComposablesBoard(
     selectedCell: Pair<Int, Int>?,
     onCellSelect: (Int, Int) -> Unit,
     onSwipe: (Int, Int, String) -> Unit,
-    obstacleAnimations: List<ObstacleAnimationEvent> = emptyList()
+    obstacleAnimations: List<ObstacleAnimationEvent> = emptyList(),
+    hintHighlightCandies: Pair<Pair<Int, Int>, Pair<Int, Int>>? = null
 ) {
+    // Pulse animation for hint cells
+    val hintTransition = rememberInfiniteTransition(label = "hint_glow")
+    val hintGlowAlpha by hintTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "hint_alpha"
+    )
+
     Column(modifier = Modifier.fillMaxSize()) {
         for (r in 0 until 8) {
             Row(
@@ -1358,6 +1791,7 @@ fun GridComposablesBoard(
                     val item = board[r][c]
                     val isSelected = selectedCell?.first == r && selectedCell?.second == c
                     val cellKey = Pair(r, c)
+                    val isHintCell = hintHighlightCandies != null && (hintHighlightCandies.first == cellKey || hintHighlightCandies.second == cellKey)
                     val obstacle = obstacles[cellKey] ?: ObstacleType.NONE
                     val durability = obstacleDurability[cellKey] ?: 1
 
@@ -1367,8 +1801,8 @@ fun GridComposablesBoard(
                             .fillMaxHeight()
                             .padding(2.dp)
                             .border(
-                                width = if (isSelected) 3.dp else 0.dp,
-                                color = if (isSelected) Color.White else Color.Transparent,
+                                width = if (isSelected) 3.dp else if (isHintCell) 3.dp else 0.dp,
+                                color = if (isSelected) Color.White else if (isHintCell) Color(0xFFFFD54F).copy(alpha = hintGlowAlpha) else Color.Transparent,
                                 shape = RoundedCornerShape(10.dp)
                             )
                             .pointerInput(r, c) {
@@ -1947,96 +2381,184 @@ fun VictoryDialog(viewModel: GameViewModel, score: Long) {
         onDismissRequest = { viewModel.navigateTo(GameScreen.Map) },
         properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
     ) {
-        Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF2C1033)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            border = BorderStroke(3.dp, Color(0xFFFFD54F))
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            ConfettiShower()
+
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2C1033)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                border = BorderStroke(3.dp, Color(0xFFFFD54F))
             ) {
-                Text(
-                    text = "LEVEL COMPLETE!",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFFFFD54F)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Stars rating animations
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    for (i in 1..3) {
-                        val active = i <= stars
-                        val tint = if (active) Color(0xFFFFD54F) else Color.Gray
-                        val scale = if (active) 1.2f else 0.9f
-                        
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = "Star",
-                            tint = tint,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .scale(scale)
-                        )
+                    Text(
+                        text = "LEVEL COMPLETE!",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFFFFD54F)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Stars rating animations
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        for (i in 1..3) {
+                            val active = i <= stars
+                            val tint = if (active) Color(0xFFFFD54F) else Color(0xFF424242)
+                            
+                            var visibleState by remember { mutableStateOf(false) }
+                            LaunchedEffect(Unit) {
+                                kotlinx.coroutines.delay(i * 300L)
+                                visibleState = true
+                            }
+                            
+                            val scale by animateFloatAsState(
+                                targetValue = if (visibleState && active) 1.35f else if (visibleState) 1f else 0f,
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                                label = "star_pop"
+                            )
+                            
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = "Star",
+                                tint = tint,
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .scale(scale)
+                            )
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = "Your Score: $score",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                    Text(
+                        text = "Your Score: $score",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = "Bonus Rewards Unlocked!",
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.6f)
-                )
+                    Text(
+                        text = "Bonus Rewards Unlocked!",
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                // Reward Chest layout
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                        .padding(12.dp)
-                ) {
-                    Text(text = "🎁", fontSize = 32.sp)
-                    Column {
-                        Text("+150 Gold Coins", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Text("+5 Power Gems", color = Color.White, fontSize = 12.sp)
+                    // Reward Chest layout
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(text = "🎁", fontSize = 32.sp)
+                        Column {
+                            Text("+150 Gold Coins", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("+5 Power Gems", color = Color.White, fontSize = 12.sp)
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                Button(
-                    onClick = { viewModel.navigateTo(GameScreen.Map) },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD54F)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("CONTINUE", color = Color(0xFF3F2B00), fontWeight = FontWeight.Black, fontSize = 16.sp)
+                    Button(
+                        onClick = { viewModel.navigateTo(GameScreen.Map) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD54F)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("CONTINUE", color = Color(0xFF3F2B00), fontWeight = FontWeight.Black, fontSize = 16.sp)
+                    }
                 }
             }
         }
     }
 }
+
+@Composable
+fun ConfettiShower() {
+    val state = remember {
+        List(45) {
+            ConfettiParticleState(
+                x = kotlin.random.Random.nextFloat() * 400f,
+                y = -(50f + kotlin.random.Random.nextFloat() * 300f),
+                speedY = 5f + kotlin.random.Random.nextFloat() * 7f,
+                rotation = kotlin.random.Random.nextFloat() * 360f,
+                rotationSpeed = -5f + kotlin.random.Random.nextFloat() * 10f,
+                color = listOf(
+                    Color(0xFFFF1744), Color(0xFF00E676), Color(0xFFFFD54F),
+                    Color(0xFF29B6F6), Color(0xFFE040FB), Color(0xFFFF9100)
+                ).random(),
+                shapeType = (0..2).random()
+            )
+        }
+    }
+
+    var triggerTick by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(16)
+            for (p in state) {
+                p.y += p.speedY
+                p.rotation += p.rotationSpeed
+                if (p.y > 800f) {
+                    p.y = -50f
+                    p.x = kotlin.random.Random.nextFloat() * 400f
+                }
+            }
+            triggerTick++
+        }
+    }
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        triggerTick.let { 
+            for (p in state) {
+                rotate(degrees = p.rotation, pivot = Offset(p.x, p.y)) {
+                    when (p.shapeType) {
+                        0 -> drawCircle(color = p.color, radius = 6.dp.toPx(), center = Offset(p.x, p.y))
+                        1 -> drawRect(color = p.color, topLeft = Offset(p.x - 5.dp.toPx(), p.y - 5.dp.toPx()), size = Size(10.dp.toPx(), 10.dp.toPx()))
+                        else -> {
+                            val path = Path().apply {
+                                moveTo(p.x, p.y - 6.dp.toPx())
+                                lineTo(p.x - 6.dp.toPx(), p.y + 6.dp.toPx())
+                                lineTo(p.x + 6.dp.toPx(), p.y + 6.dp.toPx())
+                                close()
+                            }
+                            drawPath(path, color = p.color)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+class ConfettiParticleState(
+    var x: Float,
+    var y: Float,
+    val speedY: Float,
+    var rotation: Float,
+    val rotationSpeed: Float,
+    val color: Color,
+    val shapeType: Int
+)
 
 // 6. OUT OF MOVES LOSS POPUP
 @Composable

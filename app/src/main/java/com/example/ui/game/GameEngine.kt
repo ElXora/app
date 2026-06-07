@@ -877,4 +877,109 @@ class Match3Engine(private val config: LevelConfig) {
         SoundManager.playSweepTone(800.0, 300.0, 250, 0.55f)
         return cleared
     }
+
+    // Direct zone clearing (e.g. for TNT spinner landing)
+    fun damageZoneDirect(r: Int, c: Int, radius: Int = 1): MatchResult {
+        val explodedPoints = mutableListOf<Pair<Int, Int>>()
+        val clearedBlocks = mutableListOf<Pair<Pair<Int, Int>, ObstacleType>>()
+        val explodedCandies = mutableListOf<CandyItem>()
+        var pointsGained = 0L
+
+        for (dr in -radius..radius) {
+            for (dc in -radius..radius) {
+                val targetR = r + dr
+                val targetC = c + dc
+                if (targetR in 0 until rows && targetC in 0 until cols) {
+                    val cell = Pair(targetR, targetC)
+                    val candy = board[targetR][targetC]
+                    if (candy != null) {
+                        board[targetR][targetC] = null
+                        if (cell !in explodedPoints) {
+                            explodedPoints.add(cell)
+                            explodedCandies.add(candy)
+                            pointsGained += 100L
+                        }
+                    }
+                    if (obstacles.containsKey(cell)) {
+                        damageObstacleAt(cell, clearedBlocks)
+                        pointsGained += 200L
+                    }
+                }
+            }
+        }
+
+        return MatchResult(
+            matchesFound = explodedPoints,
+            specialCreated = emptyMap(),
+            clearedObstacles = clearedBlocks,
+            pointsScored = pointsGained,
+            damageToBoss = pointsGained / 10,
+            explodedCandies = explodedCandies
+        )
+    }
+
+    // Find any potential match-3 trigger swap for user hints
+    fun findPossibleSwipeMatch(): Pair<Pair<Int, Int>, Pair<Int, Int>>? {
+        val directions = listOf(Pair(0, 1), Pair(1, 0)) // Right and Down swaps
+        for (r in 0 until rows) {
+            for (c in 0 until cols) {
+                for (dir in directions) {
+                    val nr = r + dir.first
+                    val nc = c + dir.second
+                    if (nr in 0 until rows && nc in 0 until cols) {
+                        val c1 = board[r][c]
+                        val c2 = board[nr][nc]
+                        if (c1 != null && c2 != null) {
+                            // Run the trial swap
+                            board[r][c] = c2
+                            board[nr][nc] = c1
+                            
+                            val hasMatch = hasAnyMatchOnBoard()
+                            
+                            // Restore back immediately
+                            board[r][c] = c1
+                            board[nr][nc] = c2
+                            
+                            if (hasMatch) {
+                                return Pair(Pair(r, c), Pair(nr, nc))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    private fun hasAnyMatchOnBoard(): Boolean {
+        // Horizontal checker
+        for (r in 0 until rows) {
+            var matchLen = 1
+            for (c in 1 until cols) {
+                val current = board[r][c]
+                val prev = board[r][c - 1]
+                if (current != null && prev != null && current.type == prev.type && current.type != CandyType.COLOR_BOMB) {
+                    matchLen++
+                    if (matchLen >= 3) return true
+                } else {
+                    matchLen = 1
+                }
+            }
+        }
+        // Vertical checker
+        for (c in 0 until cols) {
+            var matchLen = 1
+            for (r in 1 until rows) {
+                val current = board[r][c]
+                val prev = board[r - 1][c]
+                if (current != null && prev != null && current.type == prev.type && current.type != CandyType.COLOR_BOMB) {
+                    matchLen++
+                    if (matchLen >= 3) return true
+                } else {
+                    matchLen = 1
+                }
+            }
+        }
+        return false
+    }
 }

@@ -26,6 +26,30 @@ sealed class GameScreen {
     data class Gameplay(val level: Int) : GameScreen()
 }
 
+enum class BossCinematic {
+    INTRO_START,
+    INTRO_JUMP,
+    INTRO_IMPACT,
+    INTRO_ROAR,
+    OUTRO_FREEZE,
+    OUTRO_FINAL_HIT,
+    OUTRO_WHITE_FLASH,
+    OUTRO_DEATH_REACTION,
+    OUTRO_FOCUS,
+    OUTRO_BREAKING,
+    OUTRO_DEATH_ROAR,
+    OUTRO_COLLAPSE,
+    OUTRO_IMPACT,
+    OUTRO_SILENCE,
+    OUTRO_VICTORY_EXPLOSION,
+    OUTRO_REWARD_DROP,
+    OUTRO_CELEBRATION,
+    OUTRO_DISAPPEAR,
+    OUTRO_CHEST_LAND,
+    OUTRO_CHEST_OPEN,
+    OUTRO_STAR_REVEAL
+}
+
 // Sparkle/Floating Combat text animations model
 data class FloatingText(
     val id: Long,
@@ -144,6 +168,25 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val boardFlash = MutableStateFlow(false)
     val screenShakeOffset = MutableStateFlow(Pair(0f, 0f))
     val rainbowVortexActive = MutableStateFlow(false)
+
+    // Boss fight cinematic sequence states
+    val bossCinematicState = MutableStateFlow<BossCinematic?>(null)
+
+    // Pre-level booster select states
+    val selectedPreLevel = MutableStateFlow<Int?>(null)
+
+    // Kingdom building systems
+    val kingdomLevel = MutableStateFlow(1)
+    val buildingLevels = MutableStateFlow(mapOf("castle" to 0, "mill" to 0, "garden" to 0, "fountain" to 0, "statue" to 0))
+
+    // Idle matching hints systems
+    val lastInteractionTime = MutableStateFlow(System.currentTimeMillis())
+    val hintHighlightCandies = MutableStateFlow<Pair<Pair<Int, Int>, Pair<Int, Int>>?>(null)
+
+    fun registerUserInteraction() {
+        lastInteractionTime.value = System.currentTimeMillis()
+        hintHighlightCandies.value = null
+    }
     
     val lightningArcs = MutableStateFlow<List<LightningArc>>(emptyList())
     val flyingSpinners = MutableStateFlow<List<FlyingSpinner>>(emptyList())
@@ -268,9 +311,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val tc = spinner.toC.roundToInt().coerceIn(0, 7)
         val engine = currentEngine ?: return
         
-        spawnParticles(tr.toFloat(), tc.toFloat(), ParticleShape.SPARKLE, Color(0xFF00E5FF), count = 10, speedFactor = 1.2f)
+        val res = if (spinner.isBombSpinner) {
+            triggerScreenShake(durationMs = 500, intensity = 2.0f)
+            spawnParticles(tr.toFloat(), tc.toFloat(), ParticleShape.FLAME, Color(0xFFFF3D00), count = 25, speedFactor = 1.4f)
+            spawnParticles(tr.toFloat(), tc.toFloat(), ParticleShape.SMOKE, Color(0xFF78909C), count = 15, speedFactor = 1.0f)
+            SoundManager.playTntExplosion()
+            engine.damageZoneDirect(tr, tc, radius = 2)
+        } else {
+            spawnParticles(tr.toFloat(), tc.toFloat(), ParticleShape.SPARKLE, Color(0xFF00E5FF), count = 10, speedFactor = 1.2f)
+            SoundManager.playMatch3Pop()
+            engine.damageCellDirect(tr, tc)
+        }
         
-        val res = engine.damageCellDirect(tr, tc)
         currentScore.value += res.pointsScored
         updateGoalItems(res.explodedCandies, res.clearedObstacles.map { it.second })
         _boardState.value = engine.board.map { it.clone() }.toTypedArray()
@@ -281,8 +333,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             bossHp.value = (bossHp.value - dmg).coerceAtLeast(0)
             if (dmg > 0) addFloatingMessage("-$dmg", tr, tc, "#FF1744", isDamage = true)
         }
-        
-        SoundManager.playMatch3Pop()
     }
 
     fun findSpinnerTarget(engine: Match3Engine): Pair<Int, Int> {
@@ -364,6 +414,218 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     // Life systems & countdown
     val livesRefillCountdown = MutableStateFlow("")
+
+    fun loadKingdomData() {
+        val user = activeUser.value
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("candy_kingdom_prefs", android.content.Context.MODE_PRIVATE)
+        
+        val kdLevel = sharedPrefs.getInt("${user}_kingdom_level", 1)
+        val castle = sharedPrefs.getInt("${user}_building_castle", 0)
+        val mill = sharedPrefs.getInt("${user}_building_mill", 0)
+        val garden = sharedPrefs.getInt("${user}_building_garden", 0)
+        val fountain = sharedPrefs.getInt("${user}_building_fountain", 0)
+        val statue = sharedPrefs.getInt("${user}_building_statue", 0)
+        
+        kingdomLevel.value = kdLevel
+        buildingLevels.value = mapOf(
+            "castle" to castle,
+            "mill" to mill,
+            "garden" to garden,
+            "fountain" to fountain,
+            "statue" to statue
+        )
+    }
+
+    fun upgradeBuilding(buildingKey: String) {
+        val user = activeUser.value
+        val currentLvl = buildingLevels.value[buildingKey] ?: 0
+        if (currentLvl >= 5) {
+            addFloatingMessage("Already fully upgraded! 🏆", 4, 3, "#FFEA00")
+            return
+        }
+        
+        val price = when (currentLvl) {
+            0 -> 300
+            1 -> 500
+            2 -> 800
+            3 -> 1200
+            else -> 2000
+        }
+        
+        val hasCoins = playerState.value.coins >= price
+        if (!hasCoins) {
+            addFloatingMessage("Need $price Coins! 🪙", 4, 3, "#FF1744")
+            SoundManager.playTone(300.0, 150)
+            return
+        }
+        
+        viewModelScope.launch {
+            if (repository.consumeCoins(user, price)) {
+                val nextLvl = currentLvl + 1
+                val updatedMap = buildingLevels.value.toMutableMap()
+                updatedMap[buildingKey] = nextLvl
+                buildingLevels.value = updatedMap
+                
+                val sharedPrefs = getApplication<Application>().getSharedPreferences("candy_kingdom_prefs", android.content.Context.MODE_PRIVATE)
+                sharedPrefs.edit().putInt("${user}_building_$buildingKey", nextLvl).apply()
+                
+                SoundManager.playWoodBreak()
+                SoundManager.playRewardCollection()
+                addFloatingMessage("Built & Upgraded! 🏗️✨", 4, 3, "#00FF66")
+                
+                // Entire kingdom rank completion check
+                val allCompleted = updatedMap.values.all { it >= 5 }
+                if (allCompleted) {
+                    val nextKingdomLevel = kingdomLevel.value + 1
+                    kingdomLevel.value = nextKingdomLevel
+                    sharedPrefs.edit().putInt("${user}_kingdom_level", nextKingdomLevel).apply()
+                    
+                    val resetMap = mapOf("castle" to 0, "mill" to 0, "garden" to 0, "fountain" to 0, "statue" to 0)
+                    buildingLevels.value = resetMap
+                    for (k in resetMap.keys) {
+                        sharedPrefs.edit().putInt("${user}_building_$k", 0).apply()
+                    }
+                    
+                    addFloatingMessage("KINGDOM REACHED LEVEL $nextKingdomLevel! 👑🎇", 4, 3, "#FFEA00")
+                    triggerScreenShake(800, 1.8f)
+                }
+            }
+        }
+    }
+
+    fun runBossDeathCinematicSequence() {
+        viewModelScope.launch {
+            isBusy.value = true
+            
+            // Step 1: Freeze Frame
+            bossCinematicState.value = BossCinematic.OUTRO_FREEZE
+            SoundManager.playTone(200.0, 300)
+            delay(300)
+            
+            // Step 2: Final Damage
+            bossCinematicState.value = BossCinematic.OUTRO_FINAL_HIT
+            addFloatingMessage("CRITICAL HIT -500 💥", 2, 3, "#FFEA00", isDamage = true)
+            triggerScreenShake(durationMs = 600, intensity = 2.2f)
+            delay(400)
+            
+            // Step 3: White Impact Flash
+            bossCinematicState.value = BossCinematic.OUTRO_WHITE_FLASH
+            boardFlash.value = true
+            delay(120)
+            boardFlash.value = false
+            
+            // Step 4: Death Reaction
+            bossCinematicState.value = BossCinematic.OUTRO_DEATH_REACTION
+            delay(450)
+            
+            // Step 5: Camera Focus
+            bossCinematicState.value = BossCinematic.OUTRO_FOCUS
+            boardDarkness.value = 0.5f
+            delay(400)
+            
+            // Step 6: Breaking Effect
+            bossCinematicState.value = BossCinematic.OUTRO_BREAKING
+            SoundManager.playWoodBreak()
+            delay(450)
+            
+            // Step 7: Death Roar
+            bossCinematicState.value = BossCinematic.OUTRO_DEATH_ROAR
+            SoundManager.playTone(180.0, 700)
+            triggerScreenShake(durationMs = 800, intensity = 2.5f)
+            delay(700)
+            
+            // Step 8: Collapse
+            bossCinematicState.value = BossCinematic.OUTRO_COLLAPSE
+            delay(500)
+            
+            // Step 9: Impact
+            bossCinematicState.value = BossCinematic.OUTRO_IMPACT
+            boardFlash.value = true
+            delay(100)
+            boardFlash.value = false
+            triggerScreenShake(durationMs = 600, intensity = 2.4f)
+            delay(450)
+            
+            // Step 10: Silence Moment
+            bossCinematicState.value = BossCinematic.OUTRO_SILENCE
+            delay(500)
+            
+            // Step 11: Victory Explosion
+            bossCinematicState.value = BossCinematic.OUTRO_VICTORY_EXPLOSION
+            SoundManager.playLevelStart()
+            spawnParticles(3f, 3f, ParticleShape.CONFETTI, Color.White, count = 40, speedFactor = 1.3f)
+            delay(600)
+            
+            // Step 12: Reward Drop
+            bossCinematicState.value = BossCinematic.OUTRO_REWARD_DROP
+            delay(500)
+            
+            // Step 13: Character Celebration
+            bossCinematicState.value = BossCinematic.OUTRO_CELEBRATION
+            delay(500)
+            
+            // Step 14: Boss Disappear
+            bossCinematicState.value = BossCinematic.OUTRO_DISAPPEAR
+            spawnParticles(3f, 3f, ParticleShape.SMOKE, Color.Gray, count = 20, speedFactor = 1.0f)
+            delay(450)
+            
+            // Step 15: Chest Landing
+            bossCinematicState.value = BossCinematic.OUTRO_CHEST_LAND
+            SoundManager.playWoodBreak()
+            delay(400)
+            
+            // Step 16: Chest Opening
+            bossCinematicState.value = BossCinematic.OUTRO_CHEST_OPEN
+            SoundManager.playRewardCollection()
+            delay(650)
+            
+            // Step 17: Star Reveal
+            bossCinematicState.value = BossCinematic.OUTRO_STAR_REVEAL
+            delay(600)
+            
+            // Step 18: Level Complete screen
+            boardDarkness.value = 0f
+            bossCinematicState.value = null
+            isLevelDone.value = true
+            isBusy.value = false
+            saveProgressToDatabase(completed = true)
+        }
+    }
+
+    fun triggerBossIntroSequence() {
+        viewModelScope.launch {
+            isBusy.value = true
+            
+            // 1. INTRO_START -> Dark silhouette
+            bossCinematicState.value = BossCinematic.INTRO_START
+            boardDarkness.value = 0.65f
+            delay(600)
+            
+            // 2. INTRO_JUMP -> Boss leaps downwards
+            bossCinematicState.value = BossCinematic.INTRO_JUMP
+            delay(500)
+            
+            // 3. INTRO_IMPACT -> Smash!
+            bossCinematicState.value = BossCinematic.INTRO_IMPACT
+            SoundManager.playTntExplosion()
+            triggerScreenShake(600, 2.0f)
+            spawnParticles(1f, 3f, ParticleShape.SMOKE, Color.DarkGray, count = 25, speedFactor = 1.2f)
+            delay(500)
+            
+            // 4. INTRO_ROAR -> Boss roars!
+            bossCinematicState.value = BossCinematic.INTRO_ROAR
+            SoundManager.playTone(150.0, 600)
+            triggerScreenShake(800, 2.5f)
+            delay(900)
+            
+            // Ready, battle start
+            boardDarkness.value = 0f
+            bossCinematicState.value = null
+            isBusy.value = false
+            
+            addFloatingMessage("BATTLE START! ⚔️", 2, 3, "#FF1744")
+        }
+    }
 
     init {
         val database = AppDatabase.getDatabase(application)
@@ -533,6 +795,34 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 _currentScreen.value = GameScreen.Login
             }
         }
+
+        // Auto-refresh kingdom parameters when username shifts
+        viewModelScope.launch {
+            activeUser.collect {
+                loadKingdomData()
+            }
+        }
+
+        // Live background match hints highlighting checker loop
+        viewModelScope.launch {
+            while (true) {
+                delay(1000)
+                val isGameplay = currentScreen.value is GameScreen.Gameplay && !isBusy.value && !isLevelDone.value && !isGameOver.value
+                if (isGameplay) {
+                    val idle = System.currentTimeMillis() - lastInteractionTime.value
+                    if (idle >= 10000 && hintHighlightCandies.value == null) {
+                        currentEngine?.let { engine ->
+                            val matchHint = engine.findPossibleSwipeMatch()
+                            if (matchHint != null) {
+                                hintHighlightCandies.value = matchHint
+                            }
+                        }
+                    }
+                } else {
+                    hintHighlightCandies.value = null
+                }
+            }
+        }
     }
 
     private fun getMockEmoji(idx: Int): String {
@@ -697,11 +987,48 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             bossHp.value = computedHp
             bossPhase.value = 1
             bossAttackCountdown.value = 4
+            triggerBossIntroSequence()
+        } else {
+            bossCinematicState.value = null
         }
 
         // Initialize Engine
         val engine = Match3Engine(config)
         currentEngine = engine
+
+        // Spawn any pre-selected starter boosters!
+        if (sessionDupeCount.value > 0) {
+            val r = (3..4).random()
+            val c = (3..4).random()
+            engine.board[r][c] = CandyItem(id = (100000L..999999L).random(), type = CandyType.COLOR_BOMB, special = CandySpecial.NONE, isNew = true)
+        }
+        if (sessionTntCount.value > 0) {
+            val r = (2..5).random()
+            val c = (2..5).random()
+            engine.board[r][c] = CandyItem(id = (100000L..999999L).random(), type = engine.board[r][c]?.type ?: CandyType.RED_JELLYBEAN, special = CandySpecial.TNT, isNew = true)
+        }
+        if (sessionSpinnerCount.value > 0) {
+            viewModelScope.launch {
+                delay(1200)
+                for (i in 0 until 3) {
+                    val targetCell = findSpinnerTarget(engine)
+                    val spinnerId = particleIdCounter++
+                    flyingSpinners.value = flyingSpinners.value + FlyingSpinner(
+                        id = spinnerId,
+                        fromR = 7f,
+                        fromC = (i * 2 + 1).toFloat(),
+                        toR = targetCell.first.toFloat(),
+                        toC = targetCell.second.toFloat(),
+                        progress = 0f,
+                        rotation = 0f,
+                        isBombSpinner = false
+                    )
+                    SoundManager.playMatch4Burst()
+                    delay(300)
+                }
+            }
+        }
+
         _boardState.value = engine.board.map { it.clone() }.toTypedArray()
         updateObstaclesState(engine)
 
@@ -727,6 +1054,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun performSwipeAction(r1: Int, c1: Int, r2: Int, c2: Int) {
         val engine = currentEngine ?: return
         if (isBusy.value || isLevelDone.value || isGameOver.value) return
+        registerUserInteraction()
 
         viewModelScope.launch {
             isBusy.value = true
@@ -950,6 +1278,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 // LAUNCH AERODYNAMIC WINDSWEPT SPINNERS
+                val carriesTnt = result.detonatedTNTs.isNotEmpty()
                 result.launchedSpinners.forEach { fromCell ->
                     val targetCell = findSpinnerTarget(engine)
                     val spinnerId = particleIdCounter++
@@ -960,7 +1289,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         toR = targetCell.first.toFloat(),
                         toC = targetCell.second.toFloat(),
                         progress = 0f,
-                        rotation = 0f
+                        rotation = 0f,
+                        isBombSpinner = carriesTnt
                     )
                     SoundManager.playMatch4Burst()
                 }
@@ -1153,10 +1483,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val bossDefeated = if (isBossBattle.value) bossHp.value <= 0L else true
 
         if (goalsDone && bossDefeated) {
-            isLevelDone.value = true
-            isBusy.value = false
-            saveProgressToDatabase(completed = true)
-            SoundManager.playLevelStart() // joyful chime
+            if (isBossBattle.value && bossCinematicState.value == null) {
+                runBossDeathCinematicSequence()
+            } else if (!isBossBattle.value) {
+                isLevelDone.value = true
+                isBusy.value = false
+                saveProgressToDatabase(completed = true)
+                SoundManager.playLevelStart() // joyful chime
+            }
         } else if (movesLeft.value <= 0) {
             // Moves ended -> loss
             isGameOver.value = true
