@@ -12,8 +12,8 @@ import com.example.MainActivity
 
 object GameNotificationManager {
     private const val CHANNEL_ID = "candy_kingdom_reminders"
-    private const val CHANNEL_NAME = "Candy Kingdom Play Reminders"
-    private const val CHANNEL_DESC = "Fun daily challenges and sweet play alerts"
+    private const val CHANNEL_NAME = "Royal Crush Play Reminders"
+    private const val CHANNEL_DESC = "Fun daily challenges and royal play alerts"
     private const val NOTIFICATION_ID = 5022
 
     fun createNotificationChannel(context: Context) {
@@ -40,16 +40,16 @@ object GameNotificationManager {
         )
 
         val messages = listOf(
-            "🍭 Your Candy Kingdom lives are fully refilled! Match now! 🔥",
-            "🍇 Chocolate titan is active! Defeat him to secure 🪙 500 gold!",
-            "🧁 Don't keep the sweet candy waiting! Play level now!",
-            "🍪 Solve today's sugar puzzle! Tap here to match candies!"
+            "Your Royal Crush lives are fully refilled! Match now!",
+            "The Titan is active! Defeat him to secure 500 gold!",
+            "Keep your match-3 winning streak alive! Play your level now!",
+            "Solve today's puzzle! Tap here to match tiles!"
         )
         val selectedMessage = messages.random()
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.star_on) // star asset ensures high rendering compatibility
-            .setContentTitle("👑 Candy Kingdom")
+            .setContentTitle("Royal Crush")
             .setContentText(selectedMessage)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)

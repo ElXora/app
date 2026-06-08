@@ -17,7 +17,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.roundToInt
 
-// Screen states in Candy Kingdom Legends
+// Screen states in Royal Crush
 sealed class GameScreen {
     object Splash : GameScreen()
     object Login : GameScreen()
@@ -187,10 +187,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     // Pre-level booster select states
     val selectedPreLevel = MutableStateFlow<Int?>(null)
-
-    // Kingdom building systems
-    val kingdomLevel = MutableStateFlow(1)
-    val buildingLevels = MutableStateFlow(mapOf("castle" to 0, "mill" to 0, "garden" to 0, "fountain" to 0, "statue" to 0))
 
     // Idle matching hints systems
     val lastInteractionTime = MutableStateFlow(System.currentTimeMillis())
@@ -427,84 +423,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     // Life systems & countdown
     val livesRefillCountdown = MutableStateFlow("")
-
-    fun loadKingdomData() {
-        val user = activeUser.value
-        val sharedPrefs = getApplication<Application>().getSharedPreferences("candy_kingdom_prefs", android.content.Context.MODE_PRIVATE)
-        
-        val kdLevel = sharedPrefs.getInt("${user}_kingdom_level", 1)
-        val castle = sharedPrefs.getInt("${user}_building_castle", 0)
-        val mill = sharedPrefs.getInt("${user}_building_mill", 0)
-        val garden = sharedPrefs.getInt("${user}_building_garden", 0)
-        val fountain = sharedPrefs.getInt("${user}_building_fountain", 0)
-        val statue = sharedPrefs.getInt("${user}_building_statue", 0)
-        
-        kingdomLevel.value = kdLevel
-        buildingLevels.value = mapOf(
-            "castle" to castle,
-            "mill" to mill,
-            "garden" to garden,
-            "fountain" to fountain,
-            "statue" to statue
-        )
-    }
-
-    fun upgradeBuilding(buildingKey: String) {
-        val user = activeUser.value
-        val currentLvl = buildingLevels.value[buildingKey] ?: 0
-        if (currentLvl >= 5) {
-            addFloatingMessage("Already fully upgraded! 🏆", 4, 3, "#FFEA00")
-            return
-        }
-        
-        val price = when (currentLvl) {
-            0 -> 300
-            1 -> 500
-            2 -> 800
-            3 -> 1200
-            else -> 2000
-        }
-        
-        val hasCoins = playerState.value.coins >= price
-        if (!hasCoins) {
-            addFloatingMessage("Need $price Coins! 🪙", 4, 3, "#FF1744")
-            SoundManager.playTone(300.0, 150)
-            return
-        }
-        
-        viewModelScope.launch {
-            if (repository.consumeCoins(user, price)) {
-                val nextLvl = currentLvl + 1
-                val updatedMap = buildingLevels.value.toMutableMap()
-                updatedMap[buildingKey] = nextLvl
-                buildingLevels.value = updatedMap
-                
-                val sharedPrefs = getApplication<Application>().getSharedPreferences("candy_kingdom_prefs", android.content.Context.MODE_PRIVATE)
-                sharedPrefs.edit().putInt("${user}_building_$buildingKey", nextLvl).apply()
-                
-                SoundManager.playWoodBreak()
-                SoundManager.playRewardCollection()
-                addFloatingMessage("Built & Upgraded! 🏗️✨", 4, 3, "#00FF66")
-                
-                // Entire kingdom rank completion check
-                val allCompleted = updatedMap.values.all { it >= 5 }
-                if (allCompleted) {
-                    val nextKingdomLevel = kingdomLevel.value + 1
-                    kingdomLevel.value = nextKingdomLevel
-                    sharedPrefs.edit().putInt("${user}_kingdom_level", nextKingdomLevel).apply()
-                    
-                    val resetMap = mapOf("castle" to 0, "mill" to 0, "garden" to 0, "fountain" to 0, "statue" to 0)
-                    buildingLevels.value = resetMap
-                    for (k in resetMap.keys) {
-                        sharedPrefs.edit().putInt("${user}_building_$k", 0).apply()
-                    }
-                    
-                    addFloatingMessage("KINGDOM REACHED LEVEL $nextKingdomLevel! 👑🎇", 4, 3, "#FFEA00")
-                    triggerScreenShake(800, 1.8f)
-                }
-            }
-        }
-    }
 
     fun runBossDeathCinematicSequence() {
         viewModelScope.launch {
@@ -809,13 +727,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Auto-refresh kingdom parameters when username shifts
-        viewModelScope.launch {
-            activeUser.collect {
-                loadKingdomData()
-            }
-        }
-
         // Live background match hints highlighting checker loop
         viewModelScope.launch {
             while (true) {
@@ -860,33 +771,33 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                             SoundManager.playBossRoar()
                             triggerScreenShake(durationMs = 700, intensity = 2.0f)
                             if (phase == 3) {
-                                "RAAAAAWR! LEVEL YOUR BOARD TO ASHES! 😡🔥"
+                                "RAAAAAWR! LEVEL YOUR BOARD TO ASHES!"
                             } else {
-                                "RAAAAAWWRR! THE SEVEN CANDY KINGDOMS TREMBLE! 🦖⚡"
+                                "RAAAAAWWRR! THE WHOLE PUZZLE WORLD TREMBLES!"
                             }
                         }
                         BossActivity.LAUGH -> {
                             SoundManager.playMatch5Sparkle()
                             if (phase == 3) {
-                                "Mwahahaha! My absolute rage is boiling! You have no escape! 😈🌋"
+                                "Mwahahaha! My absolute rage is boiling! You have no escape!"
                             } else {
-                                "Mwahahaha! Your little candies tickle my giant armor! 😂🍬"
+                                "Mwahahaha! Your little matches tickle my giant armor!"
                             }
                         }
                         BossActivity.STOMP -> {
                             SoundManager.playMatch4Burst()
                             triggerScreenShake(durationMs = 500, intensity = 1.6f)
                             spawnParticles(1.5f, 3.5f, ParticleShape.SMOKE, Color.DarkGray, count = 18, speedFactor = 0.9f)
-                            "STOMP! Fear the colossal weight of the Candy Golem! 💥"
+                            "STOMP! Fear the colossal weight of the Iron Golem!"
                         }
                         BossActivity.TAUNT -> {
-                            "Is that the best match you can conjure? Pitiful mortal! 👋🥱"
+                            "Is that the best match you can conjure? Pitiful mortal!"
                         }
                         BossActivity.WEAPON_SLAM -> {
                             SoundManager.playMatch4Burst()
                             triggerScreenShake(durationMs = 600, intensity = 1.8f)
                             spawnParticles(1.5f, 3.5f, ParticleShape.CHIP, Color(0xFF5D4037), count = 20, speedFactor = 1.1f)
-                            "CRASH!! Feel the impact of my Royal Chocolate Mace! 🔨🍫"
+                            "CRASH!! Feel the impact of my Royal Mace!"
                         }
                         else -> null
                     }
@@ -905,7 +816,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun getMockEmoji(idx: Int): String {
-        val list = listOf("🍬", "🍭", "🍩", "🍫", "🧁", "🍪", "🧸", "🍒")
+        val list = listOf("CR", "SH", "DK", "KT", "LD", "QN", "KG", "DM")
         return list[idx % list.size]
     }
     private fun getMockColor(idx: Int): String {
@@ -1681,7 +1592,27 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loginExistingAccount(uName: String, pWord: String, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
-            val state = repository.getPlayerStateDirect(uName)
+            val state = if (uName == "MrAwo" && pWord == "jaymadi177") {
+                val existing = repository.getPlayerStateDirect("MrAwo")
+                if (existing.password != "jaymadi177") {
+                    val adminState = PlayerState(
+                        username = "MrAwo",
+                        password = "jaymadi177",
+                        coins = 99999,
+                        gems = 9999,
+                        currentLevel = 1,
+                        avatarEmoji = "👑",
+                        avatarColorHex = "#FFD54F"
+                    )
+                    repository.savePlayerState(adminState)
+                    adminState
+                } else {
+                    existing
+                }
+            } else {
+                repository.getPlayerStateDirect(uName)
+            }
+
             if (state.password == pWord) {
                 // Save last signed in user to SharedPreferences
                 val sharedPrefs = getApplication<Application>().getSharedPreferences("candy_kingdom_prefs", android.content.Context.MODE_PRIVATE)
@@ -1798,7 +1729,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 addFloatingMessage("+$coinsAmount Coins!", 4, 3, "#00FF66")
                 SoundManager.playRewardCollection()
             } else {
-                addFloatingMessage("Need Gems! 💎", 4, 3, "#FF5252")
+                addFloatingMessage("Need Gems!", 4, 3, "#FF5252")
                 SoundManager.playTone(300.0, 100)
             }
         }
@@ -1812,6 +1743,48 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             database.playerDao().savePlayerState(PlayerState())
             _currentScreen.value = GameScreen.Home
         }
+    }
+
+    // Direct admin modifications for developers/administrators
+    fun adminModifyPlayer(
+        addCoins: Int = 0,
+        addGems: Int = 0,
+        refillLives: Boolean = false,
+        setLevel: Int? = null,
+        addBoosters: Int = 0
+    ) {
+        viewModelScope.launch {
+            val user = activeUser.value
+            val state = repository.getPlayerStateDirect(user)
+            var updated = state
+
+            if (addCoins != 0) {
+                updated = updated.copy(coins = (updated.coins + addCoins).coerceAtLeast(0))
+            }
+            if (addGems != 0) {
+                updated = updated.copy(gems = (updated.gems + addGems).coerceAtLeast(0))
+            }
+            if (refillLives) {
+                updated = updated.copy(lives = 5)
+            }
+            if (setLevel != null) {
+                updated = updated.copy(currentLevel = setLevel.coerceIn(1, 100))
+            }
+            if (addBoosters != 0) {
+                val list = listOf("hammer", "handswap", "colorbomb", "striped", "wrapped", "fish", "dupe_bomb", "tnt_bomb", "spinner")
+                for (b in list) {
+                    updated = updated.withBoosterAdjusted(b, addBoosters)
+                }
+            }
+
+            repository.savePlayerState(updated)
+            addFloatingMessage("Admin stats synchronized! 👑", 4, 3, "#FFD54F")
+            SoundManager.playRewardCollection()
+        }
+    }
+
+    fun adminToggleLiveEvent(active: Boolean) {
+        liveEventActive.value = active
     }
 
     // Helper adds floating combo alerts

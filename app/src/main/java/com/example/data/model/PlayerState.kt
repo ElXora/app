@@ -19,7 +19,7 @@ data class PlayerState(
     val musicEnabled: Boolean = true,
     val sfxEnabled: Boolean = true,
     val avatarColorHex: String = "#FF1744",
-    val avatarEmoji: String = "🍬",
+    val avatarEmoji: String = "CR",
     val countryCode: String = "US",
     val avatarUri: String = "",
     val eventLevelsCompleted: Int = 0,

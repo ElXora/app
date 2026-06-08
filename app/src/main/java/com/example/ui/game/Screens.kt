@@ -56,6 +56,97 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalDensity
 import kotlin.math.roundToInt
 
+fun getSafeAvatarLabel(avatarString: String): String {
+    return when (avatarString) {
+        "🍬" -> "CR"
+        "🍭" -> "SH"
+        "🍩" -> "DK"
+        "🍫" -> "KT"
+        "🧁" -> "LD"
+        "🍪" -> "QN"
+        "🧸" -> "KG"
+        "👑" -> "CR"
+        "🛡️" -> "SH"
+        "⚔️" -> "KT"
+        "🏰" -> "LD"
+        "💎" -> "DM"
+        "🌟" -> "ST"
+        "🦁" -> "KG"
+        else -> if (avatarString.length > 2) avatarString.take(2).uppercase() else avatarString.uppercase()
+    }
+}
+
+@Composable
+fun GoldCoinIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val r = size.minDimension / 2
+        // Gold Outer Ring
+        drawCircle(
+            color = Color(0xFFFFD700),
+            radius = r
+        )
+        // Shadow Core
+        drawCircle(
+            color = Color(0xFFB8860B),
+            radius = r * 0.85f
+        )
+        // Bright Inner Gold
+        drawCircle(
+            color = Color(0xFFFFE135),
+            radius = r * 0.7f
+        )
+    }
+}
+
+@Composable
+fun ShinyGemIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val path = Path().apply {
+            moveTo(w / 2, 0f)
+            lineTo(w, h * 0.35f)
+            lineTo(w * 0.8f, h)
+            lineTo(w * 0.2f, h)
+            lineTo(0f, h * 0.35f)
+            close()
+        }
+        drawPath(
+            path = path,
+            color = Color(0xFF00E5FF)
+        )
+        val innerPath = Path().apply {
+            moveTo(w / 2, h * 0.15f)
+            lineTo(w * 0.85f, h * 0.38f)
+            lineTo(w * 0.7f, h * 0.85f)
+            lineTo(w * 0.3f, h * 0.85f)
+            lineTo(w * 0.15f, h * 0.38f)
+            close()
+        }
+        drawPath(
+            path = innerPath,
+            color = Color(0xFFE0F7FA).copy(alpha = 0.7f)
+        )
+    }
+}
+
+@Composable
+fun HeartIcon(modifier: Modifier = Modifier, empty: Boolean = false) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val path = Path().apply {
+            moveTo(w / 2f, h * 0.25f)
+            cubicTo(w * 0.2f, h * -0.1f, w * -0.1f, h * 0.4f, w / 2f, h * 0.9f)
+            cubicTo(w * 1.1f, h * 0.4f, w * 0.8f, h * -0.1f, w / 2f, h * 0.25f)
+        }
+        drawPath(
+            path = path,
+            color = if (empty) Color(0xFF555555) else Color(0xFFFF1744)
+        )
+    }
+}
+
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun GameMainNavigator(viewModel: GameViewModel) {
@@ -117,7 +208,7 @@ fun SplashScreen() {
             // High-end generated game logo
             Image(
                 painter = painterResource(id = R.drawable.img_app_icon),
-                contentDescription = "Candy Kingdom Legends Logo",
+                contentDescription = "Royal Crush Logo",
                 modifier = Modifier
                     .size(240.dp)
                     .scale(pulse)
@@ -129,7 +220,7 @@ fun SplashScreen() {
             Spacer(modifier = Modifier.height(32.dp))
 
             Text(
-                text = "CANDY KINGDOM",
+                text = "ROYAL CRUSH",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Black,
                 color = Color(0xFFFFD54F),
@@ -137,7 +228,7 @@ fun SplashScreen() {
                 fontFamily = FontFamily.SansSerif
             )
             Text(
-                text = "L E G E N D S",
+                text = "P U Z Z L E",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
@@ -185,6 +276,7 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
     var showLeaderboards by remember { mutableStateOf(false) }
     var showHearts by remember { mutableStateOf(false) }
     var showLiveEventLeaderboard by remember { mutableStateOf(false) }
+    var showAdminTools by remember { mutableStateOf(false) }
 
     val liveEventActive by viewModel.liveEventActive.collectAsState()
     val liveEventTimeRemaining by viewModel.liveEventTimeRemaining.collectAsState()
@@ -227,7 +319,7 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "🪙", fontSize = 18.sp)
+                        GoldCoinIcon(Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(text = "${state.coins}", color = Color.White, fontWeight = FontWeight.Bold)
                     }
@@ -243,7 +335,7 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = if (state.lives > 0) "❤️" else "🖤", fontSize = 18.sp)
+                        HeartIcon(Modifier.size(18.dp), empty = state.lives == 0)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(text = "${state.lives}/5", color = Color.White, fontWeight = FontWeight.Bold)
                     }
@@ -259,7 +351,7 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "💎", fontSize = 18.sp)
+                        ShinyGemIcon(Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(text = "${state.gems}", color = Color.White, fontWeight = FontWeight.Bold)
                     }
@@ -345,8 +437,51 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 3D Isometric Kingdom Builder Canvas!
-            IsometricKingdomCanvas(viewModel = viewModel, state = state)
+            // Royal Path Progression Dashboard
+            RoyalProgressDashboard(viewModel = viewModel, state = state)
+
+            if (state.username == "MrAwo") {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(2.dp, Color(0xFFFFD54F), RoundedCornerShape(16.dp))
+                        .clickable { showAdminTools = true; SoundManager.playMenuWhoosh() },
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1035)),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("👑", fontSize = 24.sp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "DEV ADMIN CONSOLE",
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFFFFD54F)
+                                )
+                                Text(
+                                    text = "Unlocked for MrAwo • Modify state",
+                                    fontSize = 11.sp,
+                                    color = Color.White.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.Filled.ArrowForward,
+                            contentDescription = "Open Admin Tools",
+                            tint = Color(0xFFFFD54F)
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -419,7 +554,7 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "🍭 BOOSTER SWEET STORE",
+                        text = "BOOSTER SHOP",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFFFE082)
@@ -505,16 +640,153 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
             BoosterShopOverlay(viewModel, state, onClose = { viewModel.showBoosterShop.value = false })
         }
 
+        if (showAdminTools) {
+            AdminToolsOverlay(viewModel, state, onClose = { showAdminTools = false })
+        }
+
+        val selectPreLvl by viewModel.selectedPreLevel.collectAsState()
+        if (selectPreLvl != null) {
+            PreLevelBoosterPopup(viewModel, state, lvlChoice = selectPreLvl!!)
+        }
+
         LiveEventAnnouncementBanner(viewModel)
-    }
+}
 }
 
 @Composable
-fun IsometricKingdomCanvas(
+fun RoyalProgressDashboard(
     viewModel: GameViewModel,
     state: PlayerState,
     modifier: Modifier = Modifier
 ) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(2.dp, Color(0xFFFFD54F), RoundedCornerShape(24.dp)),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF16092C)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "ROYAL PATHWAY",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFFA726),
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "Royal Castle Progress",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                }
+                androidx.compose.material3.Surface(
+                    color = Color(0xFFFFD54F),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "LEVEL ${state.currentLevel}",
+                        color = Color(0xFF4E342E),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Progress bar and decorations
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                // Progress filling
+                val percent = (state.currentLevel.toFloat() / 100f).coerceIn(0f, 1f)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction = percent)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(Color(0xFFFFD54F), Color(0xFFFF9800), Color(0xFFFF2A6D))
+                            )
+                        )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Meadows (lvl 1)",
+                    fontSize = 10.sp,
+                    color = Color.White.copy(alpha = 0.6f)
+                )
+                Text(
+                    text = "Milestone: Level 100",
+                    fontSize = 10.sp,
+                    color = Color(0xFFFFD54F),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Action Button: View Map Pathway
+            Button(
+                onClick = { viewModel.navigateTo(GameScreen.Map); SoundManager.playMenuWhoosh() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF311B92)),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFFFFD54F))
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = "Map Icon",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "VIEW ADVENTURE MAP",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+
+/*
     val buildings by viewModel.buildingLevels.collectAsState()
     val kingdomLvl by viewModel.kingdomLevel.collectAsState()
     
@@ -862,17 +1134,24 @@ fun IsometricKingdomCanvas(
                                 )
                             } else {
                                 Text(
-                                    text = if (currentLvl == 0) "BUILD" else "LV $currentLvl 🔨",
+                                    text = if (currentLvl == 0) "BUILD" else "UPGRADE",
                                     color = Color.White,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Text(
-                                    text = "🪙 $price",
-                                    color = Color(0xFFFFD54F),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    GoldCoinIcon(Modifier.size(10.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "$price",
+                                        color = Color(0xFFFFD54F),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
                             }
                         }
                     }
@@ -881,6 +1160,7 @@ fun IsometricKingdomCanvas(
         }
     }
 }
+*/
 
 @Composable
 fun BoosterPurchaseColumn(
@@ -912,7 +1192,7 @@ fun BoosterPurchaseColumn(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text(text = "🪙", fontSize = 12.sp)
+                GoldCoinIcon(Modifier.size(12.dp))
                 Spacer(modifier = Modifier.width(3.dp))
                 Text(text = "$cost", fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
@@ -954,7 +1234,7 @@ fun WorldMapScreen(viewModel: GameViewModel, state: PlayerState) {
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "🪙", fontSize = 15.sp)
+                    GoldCoinIcon(Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(text = "${state.coins}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
@@ -1362,7 +1642,7 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "🪙", fontSize = 16.sp)
+                    GoldCoinIcon(Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(text = "${state.coins}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
@@ -3205,7 +3485,7 @@ fun LossDialog(viewModel: GameViewModel, goals: List<LevelGoal>) {
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text(text = "🪙", fontSize = 16.sp)
+                    GoldCoinIcon(Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("BUY 5 MOVES (250 Coins)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
@@ -3273,17 +3553,13 @@ fun LoginRegisterScreen(viewModel: GameViewModel) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf("") }
-    var selectEmoji by remember { mutableStateOf("🍬") }
+    var selectEmoji by remember { mutableStateOf("CR") }
     var selectColor by remember { mutableStateOf("#E91E63") }
     var selectCountry by remember { mutableStateOf("US") }
     var customPicUri by remember { mutableStateOf("") }
 
-    val emojis = listOf("🍬", "🍭", "🍩", "🍫", "🧁", "🍪", "🧸")
+    val emojis = listOf("CR", "SH", "DK", "KT", "LD", "QN", "KG")
     val colors = listOf("#E91E63", "#9C27B0", "#673AB7", "#3F51B5", "#2196F3", "#009688", "#4CAF50", "#FFC107", "#FF9800", "#FF5722")
-    val countries = listOf(
-        Pair("US", "🇺🇸"), Pair("DE", "🇩🇪"), Pair("BR", "🇧🇷"), Pair("KR", "🇰🇷"),
-        Pair("FR", "🇫🇷"), Pair("CA", "🇨🇦"), Pair("JP", "🇯🇵"), Pair("GB", "🇬🇧")
-    )
 
     Box(
         modifier = Modifier
@@ -3441,13 +3717,13 @@ fun LoginRegisterScreen(viewModel: GameViewModel) {
                                         )
                                     }
                                 } else {
-                                    Text(selectEmoji, fontSize = 28.sp)
+                                    Text(getSafeAvatarLabel(selectEmoji), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = if (customPicUri.isNotEmpty()) "Custom Photo Loaded" else "Using Preset Emoji",
+                                    text = if (customPicUri.isNotEmpty()) "Custom Photo Loaded" else "Using Royal Avatar",
                                     color = Color.White,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
@@ -3488,7 +3764,7 @@ fun LoginRegisterScreen(viewModel: GameViewModel) {
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(em, fontSize = 20.sp)
+                                Text(getSafeAvatarLabel(em), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
                     }
@@ -3578,7 +3854,7 @@ fun LoginRegisterScreen(viewModel: GameViewModel) {
                     bottomColor = Color(0xFFC7A500)
                 ) {
                     Text(
-                        if (isSignUp) "CREATE LEGEND" else "ENTER KINGDOM",
+                        if (isSignUp) "CREATE LEGEND" else "ENTER GAME",
                         fontWeight = FontWeight.Black,
                         fontSize = 16.sp,
                         color = Color(0xFF3F2B00)
@@ -3671,16 +3947,16 @@ fun LeaderboardsOverlay(viewModel: GameViewModel, state: PlayerState, onClose: (
 
     // Base mock templates
     val mockTemplates = listOf(
-        Triple("SugarRush", "🇫🇷", "#FF3D00" to "🍭"),
-        Triple("CandyQueen", "🇧🇷", "#EC407A" to "🍩"),
-        Triple("ChocoLord", "🇩🇪", "#7E57C2" to "🍫"),
-        Triple("LollipopHero", "🇰🇷", "#26A69A" to "🧁"),
-        Triple("SweetCheeks", "🇨🇦", "#42A5F5" to "🧸"),
-        Triple("GummyBear99", "🇯🇵", "#9CCC65" to "🍬"),
-        Triple("SodaPop", "🇺🇸", "#FFCA28" to "🧸"),
-        Triple("CookieMonster", "🇬🇧", "#AB47BC" to "🍪"),
-        Triple("TuttiFrutti", "🇧🇷", "#26C6DA" to "🍭"),
-        Triple("Marshmallow", "🇩🇪", "#FF7043" to "🧁")
+        Triple("RoyalChamp", "FR", "#FF3D00" to "CR"),
+        Triple("CrownQueen", "BR", "#EC407A" to "QN"),
+        Triple("GoldLord", "DE", "#7E57C2" to "LD"),
+        Triple("RoyalKnight", "KR", "#26A69A" to "KT"),
+        Triple("ShieldHero", "CA", "#42A5F5" to "SH"),
+        Triple("DukeOfCrush", "JP", "#9CCC65" to "DK"),
+        Triple("Sovereign", "US", "#FFCA28" to "KG"),
+        Triple("BaronGold", "GB", "#AB47BC" to "LD"),
+        Triple("GrandDuchess", "BR", "#26C6DA" to "QN"),
+        Triple("RoyalViscount", "DE", "#FF7043" to "DK")
     )
 
     // Coins Leaderboard
@@ -3787,16 +4063,16 @@ fun LeaderboardsOverlay(viewModel: GameViewModel, state: PlayerState, onClose: (
                         .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
                         .padding(4.dp)
                 ) {
-                    LeaderboardTabButton("🪙 Coins", activeTab == 0) { activeTab = 0; SoundManager.playSoftClick() }
-                    LeaderboardTabButton("💎 Gems", activeTab == 1) { activeTab = 1; SoundManager.playSoftClick() }
-                    LeaderboardTabButton("👑 Wins", activeTab == 2) { activeTab = 2; SoundManager.playSoftClick() }
+                    LeaderboardTabButton("COINS", activeTab == 0) { activeTab = 0; SoundManager.playSoftClick() }
+                    LeaderboardTabButton("GEMS", activeTab == 1) { activeTab = 1; SoundManager.playSoftClick() }
+                    LeaderboardTabButton("WINS", activeTab == 2) { activeTab = 2; SoundManager.playSoftClick() }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Weekly tag
                 Text(
-                    text = "⏳ S1 REWARDS LOCK IN 2D 14H",
+                    text = "RESET IN 2D 14H",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFFFFC107),
@@ -3868,16 +4144,24 @@ fun LeaderboardsOverlay(viewModel: GameViewModel, state: PlayerState, onClose: (
                                     }
                                 }
 
-                                Text(
-                                    text = when (activeTab) {
-                                        0 -> "🪙 ${item.value}"
-                                        1 -> "💎 ${item.value}"
-                                        else -> "👑 ${item.value} Wins"
-                                    },
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color.White
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val scoreText = item.value.toString()
+                                    when (activeTab) {
+                                        0 -> {
+                                            GoldCoinIcon(Modifier.size(12.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text(scoreText, fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                        }
+                                        1 -> {
+                                            ShinyGemIcon(Modifier.size(12.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text(scoreText, fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                        }
+                                        else -> {
+                                            Text("$scoreText Wins", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -3953,7 +4237,14 @@ fun HeartsRefillOverlay(viewModel: GameViewModel, state: PlayerState, onClose: (
                     containerColor = Color(0xFFFF9800),
                     bottomColor = Color(0xFFC55A00)
                 ) {
-                    Text("🪙 BUY FULL REFILL (150 Coins)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        GoldCoinIcon(Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("BUY FULL REFILL (150 Coins)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -4340,10 +4631,10 @@ fun LiveEventEndPodiumOverlay(viewModel: GameViewModel, onClose: () -> Unit) {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 val rewardsText = when (finalRank) {
-                    1 -> "🥇 REWARDS: 1 Dupe Bomb, 1 TNT Bomb, 2 Spinners!"
-                    2 -> "🥈 REWARDS: 1 TNT Bomb, 2 Spinners!"
-                    3 -> "🥉 REWARDS: 2 Spinners!"
-                    else -> "🍫 REWARDS: 100 participation coins!"
+                    1 -> "1st Place REWARDS: 1 Dupe Bomb, 1 TNT Bomb, 2 Spinners!"
+                    2 -> "2nd Place REWARDS: 1 TNT Bomb, 2 Spinners!"
+                    3 -> "3rd Place REWARDS: 2 Spinners!"
+                    else -> "Participation REWARDS: 100 participation coins!"
                 }
 
                 Card(
@@ -4369,7 +4660,7 @@ fun LiveEventEndPodiumOverlay(viewModel: GameViewModel, onClose: () -> Unit) {
                     containerColor = Color(0xFF00E676),
                     bottomColor = Color(0xFF00B0FF)
                 ) {
-                    Text("CLAIM REWARDS! 🍬", fontWeight = FontWeight.Black, color = Color.White)
+                    Text("CLAIM REWARDS!", fontWeight = FontWeight.Black, color = Color.White)
                 }
             }
         }
@@ -4395,7 +4686,7 @@ fun BoosterShopOverlay(viewModel: GameViewModel, state: PlayerState, onClose: ()
                 ) {
                     Column {
                         Text(
-                            "🍭 BOOSTER SWEET STORE",
+                            "BOOSTER SHOP",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Black,
                             color = Color(0xFFFFD54F)
@@ -4422,21 +4713,30 @@ fun BoosterShopOverlay(viewModel: GameViewModel, state: PlayerState, onClose: ()
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(10.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("🪙 Coins: ${state.coins}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        Text("💎 Gems: ${state.gems}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            GoldCoinIcon(Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Coins: ${state.coins}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            ShinyGemIcon(Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Gems: ${state.gems}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 }
 
                 LazyColumn(modifier = Modifier.weight(1f)) {
                     item {
                         ShopPurchaseRow(
-                            title = "Dupe Bomb ⚡",
+                            title = "Dupe Bomb",
                             desc = "Rainbow blast! Duplicates most prominent candies.",
                             price = 50000,
                             owned = state.getBoosterCount("dupe_bomb"),
-                            icon = "⚡"
+                            icon = "DB"
                         ) {
                             viewModel.purchaseBooster("dupe_bomb", 50000)
                         }
@@ -4444,11 +4744,11 @@ fun BoosterShopOverlay(viewModel: GameViewModel, state: PlayerState, onClose: ()
 
                     item {
                         ShopPurchaseRow(
-                            title = "TNT Bomb 💥",
+                            title = "TNT Bomb",
                             desc = "Giant explosive fuse clearing a 5x5 grid.",
                             price = 25000,
                             owned = state.getBoosterCount("tnt_bomb"),
-                            icon = "💥"
+                            icon = "TNT"
                         ) {
                             viewModel.purchaseBooster("tnt_bomb", 25000)
                         }
@@ -4456,11 +4756,11 @@ fun BoosterShopOverlay(viewModel: GameViewModel, state: PlayerState, onClose: ()
 
                     item {
                         ShopPurchaseRow(
-                            title = "Spinner 🌪️",
+                            title = "Spinner",
                             desc = "Launches spirals to crush 3 random goal blockers.",
                             price = 10000,
                             owned = state.getBoosterCount("spinner"),
-                            icon = "🌪️"
+                            icon = "SP"
                         ) {
                             viewModel.purchaseBooster("spinner", 10000)
                         }
@@ -4468,12 +4768,12 @@ fun BoosterShopOverlay(viewModel: GameViewModel, state: PlayerState, onClose: ()
 
                     item {
                         ShopPurchaseRow(
-                            title = "Coin Vault Bundle 🪙",
+                            title = "Coin Vault Bundle",
                             desc = "Instantly buy 15,000 Coins via Gem transfer.",
                             price = 20,
                             isGem = true,
                             owned = 0,
-                            icon = "🪙"
+                            icon = "COIN"
                         ) {
                             viewModel.purchaseCoinsWithGems(15000, 20)
                         }
@@ -4513,7 +4813,14 @@ fun ShopPurchaseRow(
                     .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(icon, fontSize = 24.sp)
+                when (icon) {
+                    "COIN" -> GoldCoinIcon(Modifier.size(24.dp))
+                    "GEM" -> ShinyGemIcon(Modifier.size(24.dp))
+                    "DB" -> Text("DB", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color(0xFFFFD54F))
+                    "TNT" -> Text("TNT", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color(0xFFFF1744))
+                    "SP" -> Text("SP", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color(0xFF00E5FF))
+                    else -> Text(icon, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -4533,9 +4840,13 @@ fun ShopPurchaseRow(
                 contentPadding = PaddingValues(horizontal = 10.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (isGem) "💎" else "🪙", fontSize = 12.sp)
+                    if (isGem) {
+                        ShinyGemIcon(Modifier.size(12.dp))
+                    } else {
+                        GoldCoinIcon(Modifier.size(12.dp))
+                    }
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("${price}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text("$price", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }
@@ -4642,6 +4953,224 @@ fun DecorativeBackgroundPattern() {
                     radius = currentSize,
                     center = Offset(sx, sy)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun AdminToolsOverlay(
+    viewModel: GameViewModel,
+    state: PlayerState,
+    onClose: () -> Unit
+) {
+    var adminLvl by remember { mutableStateOf(state.currentLevel) }
+    val liveEventActive by viewModel.liveEventActive.collectAsState()
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1035)),
+            border = BorderStroke(2.dp, Color(0xFFFFD54F)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                Text(
+                    text = "👑 MR AWO ADMIN TOOLS",
+                    color = Color(0xFFFFD54F),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Developer Cheat Console",
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Level Manipulation
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "SET CURRENT LEVEL",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFFA726)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { adminLvl = (adminLvl - 5).coerceAtLeast(1) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) { Text("-5", color = Color.White, fontWeight = FontWeight.Bold) }
+
+                            Button(
+                                onClick = { adminLvl = (adminLvl - 1).coerceAtLeast(1) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE64A19)),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) { Text("-1", color = Color.White, fontWeight = FontWeight.Bold) }
+
+                            Text(
+                                text = "Lvl $adminLvl",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White,
+                                modifier = Modifier.width(70.dp),
+                                textAlign = TextAlign.Center
+                            )
+
+                            Button(
+                                onClick = { adminLvl = (adminLvl + 1).coerceIn(1, 100) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) { Text("+1", color = Color.White, fontWeight = FontWeight.Bold) }
+
+                            Button(
+                                onClick = { adminLvl = (adminLvl + 5).coerceIn(1, 100) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) { Text("+5", color = Color.White, fontWeight = FontWeight.Bold) }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { viewModel.adminModifyPlayer(setLevel = adminLvl) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF311B92)),
+                            modifier = Modifier.fillMaxWidth().height(36.dp)
+                        ) {
+                            Text("APPLY LEVEL SELECTION", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                // Add Currency & Boosters cheats
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "QUICK CHEATS & RESOURCES",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFFA726),
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { viewModel.adminModifyPlayer(addCoins = 10000) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676)),
+                                modifier = Modifier.weight(1f).height(38.dp)
+                            ) {
+                                Text("+10K Coins", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                            Button(
+                                onClick = { viewModel.adminModifyPlayer(addGems = 1000) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00B0FF)),
+                                modifier = Modifier.weight(1f).height(38.dp)
+                            ) {
+                                Text("+1K Gems", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { viewModel.adminModifyPlayer(refillLives = true) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEC407A)),
+                                modifier = Modifier.weight(1f).height(38.dp)
+                            ) {
+                                Text("Refill 5 Lives", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                            Button(
+                                onClick = { viewModel.adminModifyPlayer(addBoosters = 10) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
+                                modifier = Modifier.weight(1f).height(38.dp)
+                            ) {
+                                Text("+10 Boosters", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+                    }
+                }
+
+                // Interactive Live Event Toggle
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "LIVE TOURNAMENT EVENT STATUS",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFFA726)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (liveEventActive) "Status: ACTIVE 🏆" else "Status: INACTIVE ⏳",
+                                color = if (liveEventActive) Color(0xFF00FF66) else Color.White.copy(alpha = 0.6f),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                            Button(
+                                onClick = { viewModel.adminToggleLiveEvent(!liveEventActive) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (liveEventActive) Color(0xFFE53935) else Color(0xFF43A047)
+                                ),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text(
+                                    text = if (liveEventActive) "DISABLE" else "ENABLE",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Close Button
+                Button(
+                    onClick = onClose,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.15f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Close Panel", color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
