@@ -687,7 +687,7 @@ fun RoyalProgressDashboard(
                         letterSpacing = 1.sp
                     )
                     Text(
-                        text = "Royal Castle Progress",
+                        text = "Royal Journey Progress",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White
