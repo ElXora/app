@@ -208,6 +208,8 @@ class Match3Engine(private val config: LevelConfig) {
     val rows = 8
     val cols = 8
 
+    val forceExplodeCells = mutableSetOf<Pair<Int, Int>>()
+
     // We store candies in a flat mutable 2D array coordinates list to simplify state emissions
     var board = Array(rows) { Array<CandyItem?>(cols) { null } }
         private set
@@ -345,6 +347,9 @@ class Match3Engine(private val config: LevelConfig) {
     // Scans board, returns matches, updates obstacles, refills, returns cascade list
     fun processMatchesAndCollapse(): MatchResult {
         val matchedCells = mutableSetOf<Pair<Int, Int>>()
+        matchedCells.addAll(forceExplodeCells)
+        forceExplodeCells.clear()
+
         val specialCandidates = mutableMapOf<Pair<Int, Int>, Pair<CandyType, CandySpecial>>()
         val clearedBlocks = mutableListOf<Pair<Pair<Int, Int>, ObstacleType>>()
         
@@ -461,6 +466,28 @@ class Match3Engine(private val config: LevelConfig) {
             specialCandidates[target] = Pair(type, CandySpecial.TNT)
             pointsGained += 800
             bossDamageDealt += 80
+        }
+
+        // Any TNT or Spinner adjacent to any matched cells is also detonated ("breaked by anything or by just sliding")
+        if (matchedCells.isNotEmpty()) {
+            val adjacentSpecials = mutableSetOf<Pair<Int, Int>>()
+            for (matchedCell in matchedCells) {
+                val r = matchedCell.first
+                val c = matchedCell.second
+                val neighbors = listOf(Pair(r - 1, c), Pair(r + 1, c), Pair(r, c - 1), Pair(r, c + 1))
+                for (neighbor in neighbors) {
+                    val nr = neighbor.first
+                    val nc = neighbor.second
+                    if (nr in 0 until rows && nc in 0 until cols) {
+                        val neighborCandy = board[nr][nc]
+                        if (neighborCandy != null && !matchedCells.contains(neighbor) &&
+                            (neighborCandy.special == CandySpecial.TNT || neighborCandy.special == CandySpecial.SPINNER)) {
+                            adjacentSpecials.add(neighbor)
+                        }
+                    }
+                }
+            }
+            matchedCells.addAll(adjacentSpecials)
         }
 
         // Apply explosion logic of nested specials!

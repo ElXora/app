@@ -1055,6 +1055,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val candy1 = boardState.value.getOrNull(r1)?.getOrNull(c1)
             val candy2 = boardState.value.getOrNull(r2)?.getOrNull(c2)
             val isColorBombSwap = (candy1?.type == CandyType.COLOR_BOMB) || (candy2?.type == CandyType.COLOR_BOMB)
+            val isTntOrSpinnerSwap = (candy1?.special == CandySpecial.TNT) || (candy2?.special == CandySpecial.TNT) ||
+                                     (candy1?.special == CandySpecial.SPINNER) || (candy2?.special == CandySpecial.SPINNER)
 
             // Swap visual change
             val success = engine.swapCandies(r1, c1, r2, c2)
@@ -1132,6 +1134,22 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     engine.collapseBoard()
                     _boardState.value = engine.board.map { it.clone() }.toTypedArray()
                     processMatchesAndRunCascade()
+                } else if (isTntOrSpinnerSwap) {
+                    // Force explosion of the swapped specials at their destination coordinates!
+                    if (candy1?.special == CandySpecial.TNT || candy1?.special == CandySpecial.SPINNER) {
+                        engine.forceExplodeCells.add(Pair(r2, c2))
+                    }
+                    if (candy2?.special == CandySpecial.TNT || candy2?.special == CandySpecial.SPINNER) {
+                        engine.forceExplodeCells.add(Pair(r1, c1))
+                    }
+
+                    // Run the explosive cascade automatically!
+                    processMatchesAndRunCascade()
+
+                    // Taking this swap/slide takes a move as normal
+                    movesLeft.value = (movesLeft.value - 1).coerceAtLeast(0)
+                    evaluateBossAttackStep()
+                    checkGameEndConditions()
                 } else {
                     // Evaluate matches normally
                     val matchesMade = processMatchesAndRunCascade()

@@ -16,24 +16,34 @@ object GameNotificationManager {
     private const val CHANNEL_DESC = "Fun daily challenges and royal play alerts"
     private const val NOTIFICATION_ID = 5022
 
+    private fun getAttributionContext(context: Context): Context {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.createAttributionContext("notifications")
+        } else {
+            context
+        }
+    }
+
     fun createNotificationChannel(context: Context) {
+        val attrContext = getAttributionContext(context)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val importance = NotificationManager.IMPORTANCE_DEFAULT
             val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
                 description = CHANNEL_DESC
             }
             val notificationManager: NotificationManager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                attrContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
     }
 
     fun triggerPlayReminderNotification(context: Context) {
-        val intent = Intent(context, MainActivity::class.java).apply {
+        val attrContext = getAttributionContext(context)
+        val intent = Intent(attrContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
         val pendingIntent: PendingIntent = PendingIntent.getActivity(
-            context,
+            attrContext,
             0,
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -47,7 +57,7 @@ object GameNotificationManager {
         )
         val selectedMessage = messages.random()
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(attrContext, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.star_on) // star asset ensures high rendering compatibility
             .setContentTitle("Royal Crush")
             .setContentText(selectedMessage)
@@ -56,7 +66,7 @@ object GameNotificationManager {
             .setAutoCancel(true)
 
         try {
-            val notificationManager = NotificationManagerCompat.from(context)
+            val notificationManager = NotificationManagerCompat.from(attrContext)
             notificationManager.notify(NOTIFICATION_ID, builder.build())
         } catch (e: Exception) {
             e.printStackTrace()

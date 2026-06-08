@@ -16,9 +16,15 @@ abstract class AppDatabase : RoomDatabase() {
         private var INSTANCE: AppDatabase? = null
 
         fun getDatabase(context: Context): AppDatabase {
+            val appCtx = context.applicationContext
+            val finalContext = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                appCtx.createAttributionContext("default")
+            } else {
+                appCtx
+            }
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
-                    context.applicationContext,
+                    finalContext,
                     AppDatabase::class.java,
                     "candy_kingdom_db"
                 )

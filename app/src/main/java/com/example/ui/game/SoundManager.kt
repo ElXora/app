@@ -15,9 +15,37 @@ object SoundManager {
     var sfxEnabled = true
 
     private var appContext: Context? = null
+    private var vibrator: android.os.Vibrator? = null
 
     fun initialize(context: Context) {
-        appContext = context.applicationContext
+        val appCtx = context.applicationContext
+        appContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            appCtx.createAttributionContext("audio")
+        } else {
+            appCtx
+        }
+
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = appContext?.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager
+            vibratorManager?.defaultVibrator ?: (appContext?.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator)
+        } else {
+            @Suppress("DEPRECATION")
+            appContext?.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+        }
+    }
+
+    fun vibrate(durationMs: Long) {
+        val vib = vibrator ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vib.vibrate(android.os.VibrationEffect.createOneShot(durationMs, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vib.vibrate(durationMs)
+            }
+        } catch (e: Exception) {
+            // fail-safe
+        }
     }
 
     fun playTone(frequency: Double, durationMs: Int, volume: Float = 0.4f) {
@@ -38,7 +66,11 @@ object SoundManager {
                     } else {
                         1.0f
                     }
-                    samples[i] = (sin(angle) * volume * envelope).toFloat()
+                    // Add warm wooden/hollow harmonics (Fundamental + 2nd harmonic + 3rd harmonic)
+                    // This imitates a pleasant physical mallet (marimba) pop in Candy Crush & Royal Kingdom
+                    val sampleValue = sin(angle) + 0.35 * sin(2.0 * angle) + 0.15 * sin(3.0 * angle)
+                    val finalSample = (sampleValue / 1.5).toFloat()
+                    samples[i] = finalSample * volume * envelope
                 }
                 
                 val builder = AudioTrack.Builder()
@@ -57,6 +89,10 @@ object SoundManager {
                     )
                     .setBufferSizeInBytes(samples.size * 4)
                     .setTransferMode(AudioTrack.MODE_STATIC)
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && appContext != null) {
+                    builder.setContext(appContext!!)
+                }
 
                 val audioTrack = builder.build()
                 
@@ -110,6 +146,10 @@ object SoundManager {
                     .setBufferSizeInBytes(samples.size * 4)
                     .setTransferMode(AudioTrack.MODE_STATIC)
 
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && appContext != null) {
+                    builder.setContext(appContext!!)
+                }
+
                 val audioTrack = builder.build()
                 
                 audioTrack.write(samples, 0, samples.size, AudioTrack.WRITE_NON_BLOCKING)
@@ -125,14 +165,22 @@ object SoundManager {
     }
 
     fun playMatch3Pop() {
-        playTone(950.0, 80, 0.45f)
+        vibrate(15)
+        // A very quick bubbly upward sweep or popping chord
+        GlobalScope.launch {
+            playTone(880.0, 45, 0.45f)
+            kotlinx.coroutines.delay(20)
+            playTone(1174.66, 55, 0.45f)
+        }
     }
 
     fun playWoodHit() {
+        vibrate(10)
         playTone(320.0, 90, 0.45f)
     }
 
     fun playWoodBreak() {
+        vibrate(25)
         GlobalScope.launch {
             playTone(280.0, 100, 0.5f)
             kotlinx.coroutines.delay(40)
@@ -141,10 +189,12 @@ object SoundManager {
     }
 
     fun playStoneHit() {
+        vibrate(15)
         playTone(180.0, 110, 0.52f)
     }
 
     fun playStoneBreak() {
+        vibrate(50)
         GlobalScope.launch {
             playTone(150.0, 140, 0.6f)
             kotlinx.coroutines.delay(50)
@@ -153,10 +203,12 @@ object SoundManager {
     }
 
     fun playIceHit() {
+        vibrate(8)
         playTone(1100.0, 60, 0.42f)
     }
 
     fun playIceBreak() {
+        vibrate(20)
         GlobalScope.launch {
             playTone(1250.0, 80, 0.45f)
             kotlinx.coroutines.delay(30)
@@ -165,10 +217,12 @@ object SoundManager {
     }
 
     fun playChainHit() {
+        vibrate(12)
         playTone(850.0, 70, 0.38f)
     }
 
     fun playChainBreak() {
+        vibrate(30)
         GlobalScope.launch {
             playTone(920.0, 60, 0.42f)
             kotlinx.coroutines.delay(40)
@@ -177,10 +231,12 @@ object SoundManager {
     }
 
     fun playMagicHit() {
+        vibrate(15)
         playSweepTone(450.0, 650.0, 110, 0.4f)
     }
 
     fun playMagicBreak() {
+        vibrate(40)
         GlobalScope.launch {
             playSweepTone(700.0, 300.0, 160, 0.48f)
             kotlinx.coroutines.delay(50)
@@ -189,6 +245,7 @@ object SoundManager {
     }
 
     fun playGoalChime() {
+        vibrate(25)
         GlobalScope.launch {
             playTone(880.00, 60, 0.38f)
             kotlinx.coroutines.delay(50)
@@ -199,10 +256,15 @@ object SoundManager {
     }
 
     fun playMatch4Burst() {
-        playSweepTone(800.0, 350.0, 180, 0.5f)
+        vibrate(40)
+        GlobalScope.launch {
+            playSweepTone(880.0, 440.0, 160, 0.45f)
+            playSweepTone(523.25, 261.63, 200, 0.4f)
+        }
     }
 
     fun playMatch5Sparkle() {
+        vibrate(60)
         GlobalScope.launch {
             val notes = listOf(587.33, 698.46, 880.00, 1174.66)
             for (note in notes) {
@@ -213,19 +275,27 @@ object SoundManager {
     }
 
     fun playCombosPitchIncrease(comboIndex: Int) {
-        val baseMultiplier = 1.0 + (comboIndex * 0.15)
-        playTone(600.0 * baseMultiplier, 120, 0.4f)
+        vibrate(20)
+        val baseMultiplier = 1.0 + (comboIndex * 0.12)
+        GlobalScope.launch {
+            playTone(523.25 * baseMultiplier, 90, 0.4f)
+            kotlinx.coroutines.delay(40)
+            playTone(659.25 * baseMultiplier, 110, 0.42f)
+        }
     }
 
     fun playStripedLaser() {
+        vibrate(50)
         playSweepTone(300.0, 1500.0, 220, 0.45f)
     }
 
     fun playWrappedExplosion() {
+        vibrate(100)
         playSweepTone(140.0, 45.0, 320, 0.65f)
     }
 
     fun playColorBombRainbow() {
+        vibrate(80)
         GlobalScope.launch {
             val freqs = listOf(523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50)
             for (f in freqs) {
@@ -236,22 +306,33 @@ object SoundManager {
     }
 
     fun playTntFuse() {
+        vibrate(20)
         playSweepTone(1300.0, 950.0, 250, 0.18f)
     }
 
     fun playTntExplosion() {
-        playSweepTone(120.0, 40.0, 450, 0.7f)
+        vibrate(150)
+        GlobalScope.launch {
+            playSweepTone(140.0, 30.0, 450, 0.85f)
+            kotlinx.coroutines.delay(50)
+            playSweepTone(100.0, 20.0, 400, 0.8f)
+            kotlinx.coroutines.delay(40)
+            playTone(45.0, 500, 0.9f)
+        }
     }
 
     fun playDupeBomb() {
+        vibrate(35)
         playSweepTone(400.0, 800.0, 300, 0.4f)
     }
 
     fun playSoftClick() {
+        vibrate(5)
         playTone(650.0, 50, 0.25f)
     }
 
     fun playButtonPress() {
+        vibrate(10)
         playTone(550.0, 70, 0.38f)
     }
 
@@ -260,6 +341,7 @@ object SoundManager {
     }
 
     fun playRewardCollection() {
+        vibrate(20)
         GlobalScope.launch {
             for (i in 1..6) {
                 playTone(1046.50 + i * 150, 80, 0.35f)
@@ -269,10 +351,12 @@ object SoundManager {
     }
 
     fun playStarEarned() {
+        vibrate(40)
         playSweepTone(800.0, 1800.0, 280, 0.4f)
     }
 
     fun playObjectiveComplete() {
+        vibrate(75)
         GlobalScope.launch {
             playTone(523.25, 80, 0.4f)
             kotlinx.coroutines.delay(80)
@@ -295,6 +379,7 @@ object SoundManager {
     }
 
     fun playBossRoar() {
+        vibrate(120)
         playSweepTone(110.0, 50.0, 600, 0.65f)
     }
 
