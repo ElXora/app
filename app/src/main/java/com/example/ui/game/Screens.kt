@@ -516,32 +516,21 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
             Spacer(modifier = Modifier.height(24.dp))
 
             // Premium Level Badge Button - Play current level and prompt initial boosters selection
-            Button(
+            BadgeButton(
                 onClick = { viewModel.selectedPreLevel.value = state.currentLevel },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(68.dp)
                     .testTag("play_button")
-                    .border(3.dp, Color(0xFFFFD54F), RoundedCornerShape(34.dp)),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF00E676)
-                ),
-                shape = RoundedCornerShape(34.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text("👑", fontSize = 24.sp)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "PLAY LEVEL ${state.currentLevel}",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                }
+                Text("👑", fontSize = 24.sp)
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "PLAY LEVEL ${state.currentLevel}",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -1249,8 +1238,8 @@ fun WorldMapScreen(viewModel: GameViewModel, state: PlayerState) {
                 verticalArrangement = Arrangement.spacedBy(40.dp)
             ) {
                 // Generate level listing node items
-                // Every 10 levels we can have worlds, and bosses at 100
-                val levelsList = (1..100).toList() // Represent 1 to 100 for easy visual map traversal
+                // Every 10 levels we can have worlds, and bosses at every 10 levels
+                val levelsList = (1..160).toList() // Represent 1 to 160 for rich visual adventure map traversal
 
                 items(levelsList.chunked(5).reversed()) { rowLevels ->
                     Row(
@@ -1266,7 +1255,14 @@ fun WorldMapScreen(viewModel: GameViewModel, state: PlayerState) {
                                 lvl <= 20 -> Color(0xFF795548) // Chocolate Mountains brown
                                 lvl <= 30 -> Color(0xFFE040FB) // Jelly Jungle violet
                                 lvl <= 40 -> Color(0xFFFF9800) // Cookie Desert Orange
-                                else -> Color(0xFFE91E63) // Castle magenta
+                                lvl <= 50 -> Color(0xFFE91E63) // Marshmallow Valley red
+                                lvl <= 60 -> Color(0xFF00E5FF) // Ice Cream Glacier cyan
+                                lvl <= 70 -> Color(0xFFFF4081) // Lollipop City hot pink
+                                lvl <= 80 -> Color(0xFF7C4DFF) // Rainbow Kingdom royal purple
+                                lvl <= 90 -> Color(0xFFFF5722) // Sugar Volcano vibrant orange
+                                lvl <= 110 -> Color(0xFF3F51B5) // Shadow Candy Castle indigo
+                                lvl <= 130 -> Color(0xFF00B0FF) // Sweet Fantasy Sky soft blue
+                                else -> Color(0xFFFFD700) // Royal Dessert Palace gold
                             }
 
                             Column(
@@ -1477,7 +1473,7 @@ fun PreLevelBoosterPopup(viewModel: GameViewModel, state: com.example.data.model
                     }
 
                     // Start Game!
-                    Button(
+                    BadgeButton(
                         onClick = {
                             viewModel.selectedPreLevel.value = null
                             viewModel.loadLevelWithBoosters(
@@ -1487,13 +1483,12 @@ fun PreLevelBoosterPopup(viewModel: GameViewModel, state: com.example.data.model
                                 useSpinner = spinnerChecked
                             )
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676)),
-                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
-                            .weight(1.2f)
+                            .weight(1.3f)
+                            .height(48.dp)
                             .testTag("pre_start_button")
                     ) {
-                        Text("START 🏁", color = Color(0xFF001202), fontWeight = FontWeight.Bold)
+                        Text("START 🏁", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1598,8 +1593,14 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
+        val backgroundResId = when {
+            isBoss -> R.drawable.img_boss_background
+            level <= 10 || (level in 21..30) || (level in 41..50) -> R.drawable.img_meadows_background
+            else -> R.drawable.img_game_background
+        }
+
         Image(
-            painter = painterResource(id = R.drawable.img_game_background),
+            painter = painterResource(id = backgroundResId),
             contentDescription = "Game Background",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
@@ -1792,11 +1793,21 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                                 onCellSelect = { r, c ->
                                     val sel = selectedCell
                                     if (sel == null) {
-                                        selectedCell = Pair(r, c)
+                                        val item = board.getOrNull(r)?.getOrNull(c)
+                                        if (item?.special == com.example.ui.game.CandySpecial.TNT || item?.special == com.example.ui.game.CandySpecial.SPINNER) {
+                                            viewModel.detonateSingleSpecials(r, c)
+                                        } else {
+                                            selectedCell = Pair(r, c)
+                                        }
                                     } else {
-                                        // Tap adjacent to swap back up
-                                        viewModel.performSwipeAction(sel.first, sel.second, r, c)
-                                        selectedCell = null
+                                        if (sel == Pair(r, c)) {
+                                            selectedCell = null
+                                        } else if (kotlin.math.abs(sel.first - r) + kotlin.math.abs(sel.second - c) == 1) {
+                                            viewModel.performSwipeAction(sel.first, sel.second, r, c)
+                                            selectedCell = null
+                                        } else {
+                                            selectedCell = Pair(r, c)
+                                        }
                                     }
                                 },
                                 onSwipe = { r, c, dir ->
@@ -3358,15 +3369,13 @@ fun VictoryDialog(viewModel: GameViewModel, score: Long) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    Button(
+                    BadgeButton(
                         onClick = { viewModel.navigateTo(GameScreen.Map) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD54F)),
-                        shape = RoundedCornerShape(12.dp)
+                            .height(52.dp)
                     ) {
-                        Text("CONTINUE", color = Color(0xFF3F2B00), fontWeight = FontWeight.Black, fontSize = 16.sp)
+                        Text("CONTINUE", color = Color.White, fontWeight = FontWeight.Black, fontSize = 16.sp)
                     }
                 }
             }
@@ -3503,6 +3512,58 @@ fun LossDialog(viewModel: GameViewModel, goals: List<LevelGoal>) {
 }
 
 // ======================== BRAND NEW 3D & RETENTIVE UI SYSTEMS ========================
+
+@Composable
+fun BadgeButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable RowScope.() -> Unit
+) {
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.95f else 1f,
+        label = "badge_press_scale"
+    )
+
+    Box(
+        modifier = modifier
+            .scale(scale)
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectTapGestures(
+                    onPress = {
+                        pressed = true
+                        SoundManager.playSoftClick()
+                        try {
+                            tryAwaitRelease()
+                        } finally {
+                            pressed = false
+                            onClick()
+                        }
+                    }
+                )
+            }
+            .clip(RoundedCornerShape(16.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.badge),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.FillBounds
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            content()
+        }
+    }
+}
 
 @Composable
 fun Button3D(

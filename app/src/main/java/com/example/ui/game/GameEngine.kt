@@ -68,7 +68,9 @@ object LevelGenerator {
             level <= 70 -> "Lollipop City"
             level <= 80 -> "Rainbow Kingdom"
             level <= 90 -> "Sugar Volcano"
-            else -> "Shadow Candy Castle"
+            level <= 110 -> "Shadow Candy Castle"
+            level <= 130 -> "Sweet Fantasy Sky"
+            else -> "Royal Dessert Palace"
         }
 
         // Moves
@@ -77,8 +79,8 @@ object LevelGenerator {
         // Target Score
         val targetScore = 5000 + (level * 1200)
 
-        // Boss Battle every 100 levels
-        val isBossBattle = level % 100 == 0
+        // Boss Battle every 10 levels
+        val isBossBattle = level % 10 == 0
         val bossId = if (isBossBattle) "boss_${level}" else ""
 
         // Candy count selection
@@ -102,8 +104,15 @@ object LevelGenerator {
         // NO candy goals! Goals are strictly blocker targets.
         val goals = mutableListOf<LevelGoal>()
         if (isBossBattle) {
-            // High boss hp represented as target matching score/powerups
-            goals.add(LevelGoal(isBlocker = true, blockerType = ObstacleType.MAGIC_BARRIER, targetCount = 12))
+            // Level 100 Boss Battle style but structured to be progressively easier!
+            val barrierCount = when {
+                level < 20 -> 4
+                level < 40 -> 6
+                level < 70 -> 8
+                level < 100 -> 10
+                else -> 12 // Level 100 uses 12, identical to original but with lighter HP tuning!
+            }
+            goals.add(LevelGoal(isBlocker = true, blockerType = ObstacleType.MAGIC_BARRIER, targetCount = barrierCount))
         } else {
             // Select 1 to 2 random obstacle types for goals based on level
             val availableObstacles = mutableListOf(ObstacleType.CRATE)

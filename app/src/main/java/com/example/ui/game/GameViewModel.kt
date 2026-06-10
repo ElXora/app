@@ -895,6 +895,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun detonateSingleSpecials(r: Int, c: Int) {
+        val engine = currentEngine ?: return
+        if (isBusy.value || isLevelDone.value || isGameOver.value) return
+        registerUserInteraction()
+
+        viewModelScope.launch {
+            isBusy.value = true
+            engine.forceExplodeCells.add(Pair(r, c))
+            processMatchesAndRunCascade()
+            isBusy.value = false
+        }
+    }
+
     fun activateTntBombInGame() {
         val engine = currentEngine ?: return
         if (isBusy.value || isLevelDone.value || isGameOver.value) return
@@ -947,6 +960,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun navigateTo(screen: GameScreen) {
         _currentScreen.value = screen
+        if (screen !is GameScreen.Gameplay) {
+            SoundManager.isBossFightActive = false
+        }
     }
 
     // Handles map Level selection click
@@ -968,11 +984,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         starsAchieved.value = 0
         goalsList.value = config.goals.map { it.copy() }
 
-        // Boss Settings
+        // Boss Settings and Music Trigger
         isBossBattle.value = config.isBossBattle
+        SoundManager.isBossFightActive = config.isBossBattle
         if (config.isBossBattle) {
             bossName.value = getBossNameForLevel(level)
-            val computedHp = (level * 15L + 50L) * 10L
+            // Easier, highly tuned Boss HP scaling compared to original level 100 boss
+            val computedHp = (level * 7L + 30L) * 8L
             bossMaxHp.value = computedHp
             bossHp.value = computedHp
             bossPhase.value = 1

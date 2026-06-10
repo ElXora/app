@@ -326,14 +326,21 @@ object SoundManager {
         playSweepTone(400.0, 800.0, 300, 0.4f)
     }
 
+    var isBossFightActive = false
+
     fun playSoftClick() {
         vibrate(5)
-        playTone(650.0, 50, 0.25f)
+        playTone(710.0, 40, 0.45f) // high crisp bubble-glass pop
     }
 
     fun playButtonPress() {
-        vibrate(10)
-        playTone(550.0, 70, 0.38f)
+        vibrate(12)
+        // beautiful woody positive double-sound chord
+        GlobalScope.launch {
+            playTone(523.25, 55, 0.42f)
+            kotlinx.coroutines.delay(15)
+            playTone(659.25, 65, 0.45f)
+        }
     }
 
     fun playMenuWhoosh() {
@@ -412,15 +419,36 @@ object SoundManager {
     fun startMusicLoop() {
         if (musicJob != null) return
         musicJob = GlobalScope.launch(Dispatchers.Default) {
-            val notes = listOf(523.25, 587.33, 659.25, 783.99, 880.00) // C5 major pentatonic scale
             while (true) {
                 if (musicEnabled) {
-                    for (note in notes) {
-                        if (!musicEnabled) break
-                        playTone(note, 200, volume = 0.03f)
-                        kotlinx.coroutines.delay(450)
+                    if (isBossFightActive) {
+                        // Procedural intense boss fight synth music: tense chromatic and minor progression in lower-middle keys
+                        val bossMelody = listOf(
+                            Pair(146.83, 160), // D3
+                            Pair(174.61, 160), // F3
+                            Pair(220.00, 180), // A3
+                            Pair(207.65, 180), // G#3 (tense chromatic pitch!)
+                            Pair(146.83, 160), // D3
+                            Pair(196.00, 160), // G3
+                            Pair(185.00, 200), // F#3
+                            Pair(130.81, 240)  // low C3 tension root
+                        )
+                        for (note in bossMelody) {
+                            if (!musicEnabled || !isBossFightActive) break
+                            playTone(note.first, note.second, volume = 0.045f)
+                            kotlinx.coroutines.delay(260)
+                        }
+                        kotlinx.coroutines.delay(350)
+                    } else {
+                        // Relaxing, joyful adventure background exploration music
+                        val normalMelody = listOf(523.25, 659.25, 587.33, 698.46, 659.25, 783.99, 880.00)
+                        for (note in normalMelody) {
+                            if (!musicEnabled || isBossFightActive) break
+                            playTone(note, 210, volume = 0.02f)
+                            kotlinx.coroutines.delay(480)
+                        }
+                        kotlinx.coroutines.delay(2800)
                     }
-                    kotlinx.coroutines.delay(4000)
                 } else {
                     kotlinx.coroutines.delay(1000)
                 }
