@@ -989,8 +989,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         SoundManager.isBossFightActive = config.isBossBattle
         if (config.isBossBattle) {
             bossName.value = getBossNameForLevel(level)
-            // Easier, highly tuned Boss HP scaling compared to original level 100 boss
-            val computedHp = (level * 7L + 30L) * 8L
+            // Fully tuned, fun and beatable Boss HP scaling (level * 4 + 20) * 5
+            val computedHp = (level * 4L + 20L) * 5L
             bossMaxHp.value = computedHp
             bossHp.value = computedHp
             bossPhase.value = 1
@@ -1804,7 +1804,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 updated = updated.copy(lives = 5)
             }
             if (setLevel != null) {
-                updated = updated.copy(currentLevel = setLevel.coerceIn(1, 100))
+                updated = updated.copy(currentLevel = setLevel.coerceIn(1, 160))
             }
             if (addBoosters != 0) {
                 val list = listOf("hammer", "handswap", "colorbomb", "striped", "wrapped", "fish", "dupe_bomb", "tnt_bomb", "spinner")

@@ -312,8 +312,9 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
                 // Gold Coins Pill
                 Card(
                     modifier = Modifier.clickable { SoundManager.playSoftClick() },
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(16.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF261545)),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, Color(0xFFFFD54F).copy(alpha = 0.4f))
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -328,8 +329,9 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
                 // Hearts life pill (Clicking opens Hearts Dialog refills!)
                 Card(
                     modifier = Modifier.clickable { showHearts = true; SoundManager.playMenuWhoosh() },
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(16.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF261545)),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, Color(0xFFFF2F68).copy(alpha = 0.4f))
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -344,8 +346,9 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
                 // Gems Pill
                 Card(
                     modifier = Modifier.clickable { SoundManager.playSoftClick() },
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(16.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF261545)),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, Color(0xFF00B0FF).copy(alpha = 0.4f))
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -365,7 +368,7 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
                     .padding(vertical = 12.dp)
                     .border(
                         2.dp,
-                        if (liveEventActive) Color(0xFFFFD54F) else Color.White.copy(alpha = 0.15f),
+                        if (liveEventActive) Color(0xFFFFD54F) else Color(0xFFFFD54F).copy(alpha = 0.2f),
                         RoundedCornerShape(16.dp)
                     )
                     .clickable {
@@ -378,7 +381,7 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
                     },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (liveEventActive) Color(0xFFF50057).copy(alpha = 0.25f) else Color.Black.copy(alpha = 0.4f)
+                    containerColor = if (liveEventActive) Color(0xFF5E0927) else Color(0xFF261545)
                 )
             ) {
                 Row(
@@ -704,11 +707,11 @@ fun RoyalProgressDashboard(
                     .fillMaxWidth()
                     .height(20.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White.copy(alpha = 0.1f)),
+                    .background(Color(0xFF0F061E)),
                 contentAlignment = Alignment.CenterStart
             ) {
                 // Progress filling
-                val percent = (state.currentLevel.toFloat() / 100f).coerceIn(0f, 1f)
+                val percent = (state.currentLevel.toFloat() / 160f).coerceIn(0f, 1f)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(fraction = percent)
@@ -734,7 +737,7 @@ fun RoyalProgressDashboard(
                     color = Color.White.copy(alpha = 0.6f)
                 )
                 Text(
-                    text = "Milestone: Level 100",
+                    text = "Milestone: Level 160",
                     fontSize = 10.sp,
                     color = Color(0xFFFFD54F),
                     fontWeight = FontWeight.Bold
@@ -1465,7 +1468,7 @@ fun PreLevelBoosterPopup(viewModel: GameViewModel, state: com.example.data.model
                     // Cancel
                     Button(
                         onClick = { viewModel.selectedPreLevel.value = null },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF381F4C)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -1655,7 +1658,8 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF261545)),
+                border = BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.2f))
             ) {
                 Row(
                     modifier = Modifier
@@ -1756,8 +1760,8 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                         .aspectRatio(1f)
                         .offset(x = shakeOffset.first.dp, y = shakeOffset.second.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
-                    border = BorderStroke(3.dp, Color.White.copy(alpha = 0.15f))
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1B0E3D)),
+                    border = BorderStroke(4.dp, Color(0xFFFFD54F))
                 ) {
                     Box(
                         modifier = Modifier
@@ -1770,13 +1774,16 @@ fun GameplayScreen(viewModel: GameViewModel, level: Int) {
                             val h = size.height / 8f
                             for (r in 0 until 8) {
                                 for (c in 0 until 8) {
-                                    if ((r + c) % 2 == 0) {
-                                        drawRect(
-                                            color = Color.Black.copy(alpha = 0.12f),
-                                            topLeft = Offset(c * w, r * h),
-                                            size = Size(w, h)
-                                        )
+                                    val cellColor = if ((r + c) % 2 == 0) {
+                                        Color(0xFF2B195C)
+                                    } else {
+                                        Color(0xFF1B0E3D)
                                     }
+                                    drawRect(
+                                        color = cellColor,
+                                        topLeft = Offset(c * w, r * h),
+                                        size = Size(w, h)
+                                    )
                                 }
                             }
                         }
@@ -4101,7 +4108,7 @@ fun LeaderboardsOverlay(viewModel: GameViewModel, state: PlayerState, onClose: (
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f))
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF130826))
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
@@ -4121,7 +4128,7 @@ fun LeaderboardsOverlay(viewModel: GameViewModel, state: PlayerState, onClose: (
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                        .background(Color(0xFF130826), RoundedCornerShape(8.dp))
                         .padding(4.dp)
                 ) {
                     LeaderboardTabButton("COINS", activeTab == 0) { activeTab = 0; SoundManager.playSoftClick() }
@@ -4147,7 +4154,7 @@ fun LeaderboardsOverlay(viewModel: GameViewModel, state: PlayerState, onClose: (
                 LazyColumn(modifier = Modifier.weight(1f)) {
                     items(activeList) { item ->
                         val isSelf = item.isCurrentUser
-                        val bg = if (isSelf) Color(0xFFE91E63).copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f)
+                        val bg = if (isSelf) Color(0xFF4C1045) else Color(0xFF1F1135)
                         val border = if (isSelf) BorderStroke(1.5.dp, Color(0xFFE91E63)) else null
 
                         Card(
@@ -4699,9 +4706,10 @@ fun LiveEventEndPodiumOverlay(viewModel: GameViewModel, onClose: () -> Unit) {
                 }
 
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF130826)),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
                 ) {
                     Text(
                         text = rewardsText,
@@ -4766,7 +4774,7 @@ fun BoosterShopOverlay(viewModel: GameViewModel, state: PlayerState, onClose: ()
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF130826)),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 ) {
@@ -4856,11 +4864,12 @@ fun ShopPurchaseRow(
     onBuy: () -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF261545)),
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
+            .padding(vertical = 6.dp),
+        border = BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.2f))
     ) {
         Row(
             modifier = Modifier
@@ -4871,7 +4880,7 @@ fun ShopPurchaseRow(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                    .background(Color(0xFF130826), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 when (icon) {
@@ -5061,8 +5070,9 @@ fun AdminToolsOverlay(
                 // Level Manipulation
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.2f)),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF130826)),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
                 ) {
                     Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
@@ -5100,14 +5110,14 @@ fun AdminToolsOverlay(
                             )
 
                             Button(
-                                onClick = { adminLvl = (adminLvl + 1).coerceIn(1, 100) },
+                                onClick = { adminLvl = (adminLvl + 1).coerceIn(1, 160) },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                                 modifier = Modifier.height(32.dp)
                             ) { Text("+1", color = Color.White, fontWeight = FontWeight.Bold) }
 
                             Button(
-                                onClick = { adminLvl = (adminLvl + 5).coerceIn(1, 100) },
+                                onClick = { adminLvl = (adminLvl + 5).coerceIn(1, 160) },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                                 modifier = Modifier.height(32.dp)
@@ -5127,8 +5137,9 @@ fun AdminToolsOverlay(
                 // Add Currency & Boosters cheats
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.2f)),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF130826)),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
@@ -5178,8 +5189,9 @@ fun AdminToolsOverlay(
                 // Interactive Live Event Toggle
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.2f)),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF130826)),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
                 ) {
                     Column(
                         modifier = Modifier.padding(12.dp),

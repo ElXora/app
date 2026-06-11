@@ -380,7 +380,7 @@ class Match3Engine(private val config: LevelConfig) {
                             matchedCells.addAll(sqCells)
                             specialCandidates[Pair(r, c)] = Pair(t, CandySpecial.SPINNER)
                             pointsGained += 400
-                            bossDamageDealt += 40
+                            bossDamageDealt += 120
                         }
                     }
                 }
@@ -413,9 +413,9 @@ class Match3Engine(private val config: LevelConfig) {
                         
                         pointsGained += matchLength * 100L
                         bossDamageDealt += when (matchLength) {
-                            3 -> 10
-                            4 -> 35
-                            else -> 100
+                            3 -> 30
+                            4 -> 100
+                            else -> 250
                         }
                         c += matchLength - 1
                     }
@@ -450,9 +450,9 @@ class Match3Engine(private val config: LevelConfig) {
                         
                         pointsGained += matchLength * 100L
                         bossDamageDealt += when (matchLength) {
-                            3 -> 10
-                            4 -> 35
-                            else -> 100
+                            3 -> 30
+                            4 -> 100
+                            else -> 250
                         }
                         r += matchLength - 1
                     }
@@ -474,7 +474,7 @@ class Match3Engine(private val config: LevelConfig) {
             val type = board[target.first][target.second]?.type ?: config.allowedCandyTypes.random()
             specialCandidates[target] = Pair(type, CandySpecial.TNT)
             pointsGained += 800
-            bossDamageDealt += 80
+            bossDamageDealt += 250
         }
 
         // Any TNT or Spinner adjacent to any matched cells is also detonated ("breaked by anything or by just sliding")
@@ -514,13 +514,13 @@ class Match3Engine(private val config: LevelConfig) {
                 
                 // Explode Spinner
                 if (candy.special == CandySpecial.SPINNER) {
-                    bossDamageDealt += 50
+                    bossDamageDealt += 150
                     launchedSpinnersList.add(cell)
                 }
                 
                 // Explode TNT (clears 5x5 zone)
                 if (candy.special == CandySpecial.TNT) {
-                    bossDamageDealt += 150
+                    bossDamageDealt += 350
                     detonatedTNTsList.add(cell)
                     for (dr in -2..2) {
                         for (dc in -2..2) {
@@ -536,7 +536,7 @@ class Match3Engine(private val config: LevelConfig) {
 
                 // Explode Color Bomb (triggers cascading color clearing)
                 if (candy.type == CandyType.COLOR_BOMB) {
-                    bossDamageDealt += 300
+                    bossDamageDealt += 500
                     val availableColors = board.flatten().filterNotNull()
                         .map { it.type }
                         .filter { it != CandyType.COLOR_BOMB && it != CandyType.CHOCO_BALL }
@@ -747,7 +747,7 @@ class Match3Engine(private val config: LevelConfig) {
             specialCreated = emptyMap(),
             clearedObstacles = clearedBlocks,
             pointsScored = pointsGained,
-            damageToBoss = pointsGained / 10,
+            damageToBoss = pointsGained / 4,
             explodedCandies = explodedCandies
         )
     }
@@ -823,7 +823,7 @@ class Match3Engine(private val config: LevelConfig) {
             specialCreated = emptyMap(),
             clearedObstacles = clearedBlocks,
             pointsScored = pointsGained,
-            damageToBoss = pointsGained / 10,
+            damageToBoss = pointsGained / 4,
             explodedCandies = explodedCandies
         )
     }
@@ -956,7 +956,7 @@ class Match3Engine(private val config: LevelConfig) {
             specialCreated = emptyMap(),
             clearedObstacles = clearedBlocks,
             pointsScored = pointsGained,
-            damageToBoss = pointsGained / 10,
+            damageToBoss = pointsGained / 4,
             explodedCandies = explodedCandies
         )
     }
