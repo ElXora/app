@@ -334,10 +334,17 @@ class Match3Engine(private val config: LevelConfig) {
         // Check adjacency
         if (abs(r1 - r2) + abs(c1 - c2) != 1) return false
 
-        // Check if locked in blockers of any type!
-        if ((obstacles[Pair(r1, c1)] ?: ObstacleType.NONE) != ObstacleType.NONE ||
-            (obstacles[Pair(r2, c2)] ?: ObstacleType.NONE) != ObstacleType.NONE) {
-            return false // Swapping is locked for ANY active blocker!
+        // Check if locked in blockers of any type, except immune special bombs/spinners!
+        val candy1 = board[r1][c1]
+        val candy2 = board[r2][c2]
+        val isBomb1 = candy1?.special == CandySpecial.TNT || candy1?.special == CandySpecial.SPINNER || candy1?.type == CandyType.COLOR_BOMB
+        val isBomb2 = candy2?.special == CandySpecial.TNT || candy2?.special == CandySpecial.SPINNER || candy2?.type == CandyType.COLOR_BOMB
+
+        if (!isBomb1 && !isBomb2) {
+            if ((obstacles[Pair(r1, c1)] ?: ObstacleType.NONE) != ObstacleType.NONE ||
+                (obstacles[Pair(r2, c2)] ?: ObstacleType.NONE) != ObstacleType.NONE) {
+                return false // Swapping is locked for standard candies under any active blocker!
+            }
         }
 
         val temp = board[r1][c1]
@@ -702,30 +709,86 @@ class Match3Engine(private val config: LevelConfig) {
             null
         }
 
-        // Explode the Color Bomb cells
+        // Since swapCandies has already been executed on the board:
+        // candy1 (which was at r1, c1) is now currently at r2, c2 on the board
+        // candy2 (which was at r2, c2) is now currently at r1, c1 on the board
+        
+        val posOfCandy1 = Pair(r2, c2)
+        val posOfCandy2 = Pair(r1, c1)
+
+        // Explode the Color Bomb cells and the candies they were swapped with
         if (candy1?.type == CandyType.COLOR_BOMB) {
-            explodedPoints.add(Pair(r1, c1))
+            explodedPoints.add(posOfCandy1) // where Color Bomb is now
             explodedCandies.add(candy1)
-            board[r1][c1] = null
-        }
-        if (candy2?.type == CandyType.COLOR_BOMB) {
-            explodedPoints.add(Pair(r2, c2))
+            board[posOfCandy1.first][posOfCandy1.second] = null
+
+            explodedPoints.add(posOfCandy2) // where target item candy2 is now
+            if (candy2 != null) {
+                explodedCandies.add(candy2)
+                board[posOfCandy2.first][posOfCandy2.second] = null
+                pointsGained += 200
+            }
+        } else if (candy2?.type == CandyType.COLOR_BOMB) {
+            explodedPoints.add(posOfCandy2) // where Color Bomb is now
             explodedCandies.add(candy2)
-            board[r2][c2] = null
+            board[posOfCandy2.first][posOfCandy2.second] = null
+
+            explodedPoints.add(posOfCandy1) // where target item candy1 is now
+            if (candy1 != null) {
+                explodedCandies.add(candy1)
+                board[posOfCandy1.first][posOfCandy1.second] = null
+                pointsGained += 200
+            }
         }
 
-        // Clear target candies on the entire board
+        // Clear target candies on the entire board by replacing them with special TNTs first and detonating them
         if (targetColor != null) {
+            val targetsToReplace = mutableListOf<Pair<Int, Int>>()
             for (r in 0 until rows) {
                 for (c in 0 until cols) {
                     val tile = board[r][c]
                     if (tile?.type == targetColor) {
-                        explodedPoints.add(Pair(r, c))
-                        explodedCandies.add(tile)
-                        board[r][c] = null
-                        pointsGained += 200
+                        targetsToReplace.add(Pair(r, c))
                     }
                 }
+            }
+
+            for (pos in targetsToReplace) {
+                val r = pos.first
+                val c = pos.second
+                val tile = board[r][c] ?: continue
+
+                // 1. Temporarily replace the target candy with a gorgeous TNT Special candy (Electro bomb effect)
+                val upgradedCandy = tile.copy(special = CandySpecial.TNT)
+                board[r][c] = upgradedCandy
+
+                if (pos !in explodedPoints) {
+                    explodedPoints.add(pos)
+                    explodedCandies.add(upgradedCandy)
+                }
+
+                // 2. Explode adjacent area around each replaced candy, damaging blockers!
+                for (dr in -1..1) {
+                    for (dc in -1..1) {
+                        val tr = r + dr
+                        val tc = c + dc
+                        if (tr in 0 until rows && tc in 0 until cols) {
+                            val neighbor = Pair(tr, tc)
+                            val neighborCandy = board[tr][tc]
+                            if (neighborCandy != null && neighbor !in explodedPoints) {
+                                explodedPoints.add(neighbor)
+                                explodedCandies.add(neighborCandy)
+                                board[tr][tc] = null
+                                pointsGained += 150
+                            }
+                            // Damage blockers/goals in adjacent zones
+                            damageObstacleAt(neighbor, clearedBlocks)
+                        }
+                    }
+                }
+
+                board[r][c] = null
+                pointsGained += 300
             }
         } else {
             // Both are color bombs! Trigger full-board clear of candies

@@ -40,6 +40,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1343,156 +1345,285 @@ fun WorldMapScreen(viewModel: GameViewModel, state: PlayerState) {
 
 // 3.5 PRE-LEVEL BOOSTER POPUP SCREEN
 @Composable
+fun PreLevelBoosterCard(
+    title: String,
+    type: CandyType,
+    special: CandySpecial,
+    stock: Int,
+    isSelected: Boolean,
+    onToggle: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(width = 90.dp, height = 110.dp)
+            .clickable { onToggle() },
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(4.dp)
+                .border(
+                    width = if (isSelected) 3.dp else 1.5.dp,
+                    color = if (isSelected) Color(0xFF00FF66) else Color(0xFF8D6E63).copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(16.dp)
+                ),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isSelected) Color(0xFFE8F5E9) else Color(0xAAFFFFFF)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 11.sp,
+                    color = Color(0xFF4E342E),
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center
+                )
+                
+                Box(modifier = Modifier.size(38.dp), contentAlignment = Alignment.Center) {
+                    CandyIcon(type = type, special = special, modifier = Modifier.fillMaxSize())
+                }
+                
+                Box(
+                    modifier = Modifier
+                        .background(Color(0xFF8D6E63), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "$stock",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+        
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(20.dp)
+                    .background(Color(0xFF00FF66), CircleShape)
+                    .border(1.5.dp, Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = "Selected",
+                    tint = Color.White,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun PreLevelBoosterPopup(viewModel: GameViewModel, state: com.example.data.model.PlayerState, lvlChoice: Int) {
     var dupeChecked by remember { mutableStateOf(false) }
     var tntChecked by remember { mutableStateOf(false) }
     var spinnerChecked by remember { mutableStateOf(false) }
 
-    androidx.compose.ui.window.Dialog(
+    val rawDupeCount = state.getBoosterCount("dupe_bomb")
+    val rawTntCount = state.getBoosterCount("tnt_bomb")
+    val rawSpinnerCount = state.getBoosterCount("spinner")
+
+    Dialog(
         onDismissRequest = { viewModel.selectedPreLevel.value = null }
     ) {
-        Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1035)),
-            border = BorderStroke(2.dp, Color(0xFFFFD54F)),
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
-                .testTag("pre_level_popup")
+                .padding(12.dp)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color(0xFF0D47A1), Color(0xFF1565C0))
+                    ),
+                    shape = RoundedCornerShape(26.dp)
+                )
+                .border(4.dp, Color(0xFFFFD54F), RoundedCornerShape(26.dp))
+                .border(1.5.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(26.dp))
+                .padding(18.dp),
+            contentAlignment = Alignment.Center
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
+                modifier = Modifier.fillMaxWidth().testTag("pre_level_popup"),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Title
-                Text(
-                    text = "LEVEL $lvlChoice",
-                    color = Color(0xFFFFD54F),
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "Battle Preparation",
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
+                // Header Row with Title and Close X Button
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Spacer(modifier = Modifier.size(32.dp))
+                    Text(
+                        text = "LEVEL $lvlChoice",
+                        color = Color.White,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Black,
+                        style = TextStyle(
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.75f),
+                                offset = Offset(0f, 3f),
+                                blurRadius = 4f
+                            )
+                        )
+                    )
+                    IconButton(
+                        onClick = { viewModel.selectedPreLevel.value = null },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(Color(0xFFFF1744), CircleShape)
+                            .border(1.5.dp, Color.White, CircleShape)
+                    ) {
+                        Text("❌", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
 
-                // Objective hint card
+                // Objective hint card - Styled like raw cream-colored paper/parchment
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF120822)),
-                    shape = RoundedCornerShape(12.dp)
+                        .padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFAF5E6)),
+                    border = BorderStroke(2.dp, Color(0xFFD7CCC8)),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.padding(14.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("🎯", fontSize = 24.sp, modifier = Modifier.padding(end = 12.dp))
-                        Column {
-                            Text(
-                                text = "Objective:",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                            Text(
-                                text = if (lvlChoice % 10 == 0) "Defeat the Giant Candy Boss!" else "Match candies and clear all barriers!",
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 12.sp
-                            )
+                        Text(
+                            text = "GOAL",
+                            color = Color(0xFF5D4037),
+                            fontWeight = FontWeight.Black,
+                            fontSize = 15.sp,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            val levelConfig = remember(lvlChoice) { com.example.ui.game.LevelGenerator.generate(lvlChoice) }
+                            
+                            for (goal in levelConfig.goals) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(modifier = Modifier.size(36.dp)) {
+                                        if (goal.type != null) {
+                                            CandyIcon(type = goal.type, modifier = Modifier.fillMaxSize())
+                                        } else if (goal.isBlocker) {
+                                            drawBlockerShapeMini(goal.blockerType)
+                                        } else {
+                                            Icon(Icons.Filled.Favorite, contentDescription = "HP goal/Score", tint = Color.Red, modifier = Modifier.fillMaxSize())
+                                        }
+                                    }
+                                    Text(
+                                        text = "${goal.targetCount}",
+                                        color = Color(0xFF5D4037),
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 18.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
                 Text(
-                    text = "EQUIP INITIAL BOOSTERS",
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "SELECT BOOSTERS:",
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontWeight = FontWeight.Black,
                     fontSize = 12.sp,
                     modifier = Modifier
                         .align(Alignment.Start)
-                        .padding(bottom = 8.dp)
+                        .padding(bottom = 10.dp)
                 )
 
-                // Booster Item Row: Electro Ball
-                val rawDupeCount = state.getBoosterCount("dupe_bomb")
-                BoosterSelectionRow(
-                    title = "Electro Ball ⚡",
-                    description = "Starts with a Color Bomb!",
-                    stock = rawDupeCount,
-                    isSelected = dupeChecked,
-                    onToggle = { dupeChecked = !dupeChecked },
-                    testTag = "pre_equip_dupe"
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Booster Item Row: TNT
-                val rawTntCount = state.getBoosterCount("tnt_bomb")
-                BoosterSelectionRow(
-                    title = "TNT Explosive 💥",
-                    description = "Starts with a TNT explosive!",
-                    stock = rawTntCount,
-                    isSelected = tntChecked,
-                    onToggle = { tntChecked = !tntChecked },
-                    testTag = "pre_equip_tnt"
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Booster Item Row: Spinner
-                val rawSpinnerCount = state.getBoosterCount("spinner")
-                BoosterSelectionRow(
-                    title = "Bomb Spinner 🌪️",
-                    description = "Launches 3 obstacle-clearers!",
-                    stock = rawSpinnerCount,
-                    isSelected = spinnerChecked,
-                    onToggle = { spinnerChecked = !spinnerChecked },
-                    testTag = "pre_equip_spinner"
-                )
+                // Booster Item Row: side by side cute square 3D cards
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PreLevelBoosterCard(
+                        title = "Electro Ball",
+                        type = CandyType.COLOR_BOMB,
+                        special = CandySpecial.NONE,
+                        stock = rawDupeCount,
+                        isSelected = dupeChecked,
+                        onToggle = { if (rawDupeCount > 0) dupeChecked = !dupeChecked }
+                    )
+                    PreLevelBoosterCard(
+                        title = "TNT Bomb",
+                        type = CandyType.RED_JELLYBEAN,
+                        special = CandySpecial.TNT,
+                        stock = rawTntCount,
+                        isSelected = tntChecked,
+                        onToggle = { if (rawTntCount > 0) tntChecked = !tntChecked }
+                    )
+                    PreLevelBoosterCard(
+                        title = "Spinner",
+                        type = CandyType.RED_JELLYBEAN,
+                        special = CandySpecial.SPINNER,
+                        stock = rawSpinnerCount,
+                        isSelected = spinnerChecked,
+                        onToggle = { if (rawSpinnerCount > 0) spinnerChecked = !spinnerChecked }
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Action Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                // PLAY Green Button (bouncy, glossy 3D green block style!)
+                Button(
+                    onClick = {
+                        viewModel.selectedPreLevel.value = null
+                        viewModel.loadLevelWithBoosters(
+                            level = lvlChoice,
+                            useDupe = dupeChecked,
+                            useTnt = tntChecked,
+                            useSpinner = spinnerChecked
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .height(54.dp)
+                        .border(
+                            width = 3.dp,
+                            color = Color(0xFF81C784),
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                        .testTag("pre_start_button"),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
                 ) {
-                    // Cancel
-                    Button(
-                        onClick = { viewModel.selectedPreLevel.value = null },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF381F4C)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Cancel", color = Color.White)
-                    }
-
-                    // Start Game!
-                    BadgeButton(
-                        onClick = {
-                            viewModel.selectedPreLevel.value = null
-                            viewModel.loadLevelWithBoosters(
-                                level = lvlChoice,
-                                useDupe = dupeChecked,
-                                useTnt = tntChecked,
-                                useSpinner = spinnerChecked
+                    Text(
+                        text = "PLAY",
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 20.sp,
+                        style = TextStyle(
+                            shadow = Shadow(
+                                color = Color(0xFF1B5E20),
+                                offset = Offset(0f, 3f),
+                                blurRadius = 2f
                             )
-                        },
-                        modifier = Modifier
-                            .weight(1.3f)
-                            .height(48.dp)
-                            .testTag("pre_start_button")
-                    ) {
-                        Text("START 🏁", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
+                        )
+                    )
                 }
             }
         }
