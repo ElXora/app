@@ -70,6 +70,16 @@ fun CandyIcon(
         label = "spin"
     )
 
+    val shineProgress by infiniteTransition.animateFloat(
+        initialValue = -2.0f,
+        targetValue = 2.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shine_sweep"
+    )
+
     Box(modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val baseScale = if (special == CandySpecial.TNT) pulseScale * 1.05f else pulseScale
@@ -136,6 +146,32 @@ fun CandyIcon(
                             center = center
                         )
                     }
+                }
+
+                // --- 3D DIAGONAL SWEEP SHINE SHEEN EFFECT ON ALL CANDIES & SPECIALS ---
+                val sweepWidth = candyRadius * 0.45f
+                val sweepX = center.x + shineProgress * candyRadius * 2.2f
+                val shinePath = Path().apply {
+                    moveTo(sweepX - sweepWidth, center.y - candyRadius * 1.2f)
+                    lineTo(sweepX + sweepWidth, center.y - candyRadius * 1.2f)
+                    lineTo(sweepX + sweepWidth + candyRadius * 0.8f, center.y + candyRadius * 1.2f)
+                    lineTo(sweepX - sweepWidth + candyRadius * 0.8f, center.y + candyRadius * 1.2f)
+                    close()
+                }
+                
+                clipPath(Path().apply { addOval(Rect(center.x - candyRadius, center.y - candyRadius, center.x + candyRadius, center.y + candyRadius)) }) {
+                    drawPath(
+                        path = shinePath,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.0f),
+                                Color.White.copy(alpha = 0.72f),
+                                Color.White.copy(alpha = 0.0f)
+                            ),
+                            start = Offset(sweepX - sweepWidth, center.y - candyRadius),
+                            end = Offset(sweepX + sweepWidth + candyRadius * 0.4f, center.y + candyRadius)
+                        )
+                    )
                 }
             }
         }
@@ -646,7 +682,7 @@ private fun DrawScope.drawDiscoBall(center: Offset, radius: Float, rotation: Flo
     
     // Ambient back shadow
     drawCircle(
-        color = Color.Black.copy(alpha = 0.4f),
+        color = Color.Black.copy(alpha = 0.5f),
         radius = r,
         center = Offset(center.x + 3f, center.y + 5f)
     )
@@ -654,9 +690,9 @@ private fun DrawScope.drawDiscoBall(center: Offset, radius: Float, rotation: Flo
     // Metallic base gradient
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(Color(0xFFECEFF1), Color(0xFF455A64)),
-            center = center,
-            radius = r
+            colors = listOf(Color(0xFFFFFFFF), Color(0xFFECEFF1), Color(0xFF607D8B), Color(0xFF263238)),
+            center = Offset(center.x - r * 0.2f, center.y - r * 0.2f),
+            radius = r * 1.2f
         ),
         radius = r
     )
@@ -690,22 +726,87 @@ private fun DrawScope.drawDiscoBall(center: Offset, radius: Float, rotation: Flo
                     
                     // Shine core on each tile
                     drawRect(
-                        color = Color.White.copy(alpha = 0.6f),
-                        topLeft = Offset(tileX + 3f, tileY + 3f),
-                        size = Size((sizeW - 3f)/3f, (sizeW - 3f)/3f)
+                        color = Color.White.copy(alpha = 0.7f),
+                        topLeft = Offset(tileX + 3.5f, tileY + 3.5f),
+                        size = Size((sizeW - 3f)/2.8f, (sizeW - 3f)/2.8f)
                     )
                 }
             }
         }
+        
+        // Spherical 3D shading layer multiplied over the grid (Lens spherizer effect!)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.55f)),
+                center = center,
+                radius = r
+            ),
+            radius = r,
+            center = center
+        )
     }
     
-    // Beautiful metal outline
+    // Beautiful metal outline with 3D bevel
     drawCircle(
-        color = Color(0xFFCFD8DC),
+        color = Color(0xFFECEFF1),
         radius = r,
-        style = Stroke(1.5f.dp.toPx())
+        style = Stroke(2.dp.toPx())
     )
     
+    // 3D Glass refracting highlight ring overlay (makes it look like a glossy crystal glass ball)
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color.White.copy(alpha = 0.55f), Color.Transparent, Color.Black.copy(alpha = 0.4f)),
+            center = Offset(center.x - r * 0.35f, center.y - r * 0.35f),
+            radius = r * 1.1f
+        ),
+        radius = r,
+        center = center
+    )
+    
+    // Draw stunning electric lightning arcs around the electro ball (adds phenomenal energy power vibes!)
+    val numArcs = 3
+    for (idx in 0 until numArcs) {
+        val baseAngle = (rotation * 1.8f + idx * 120f) % 360f
+        val rad1 = Math.toRadians(baseAngle.toDouble())
+        val arcSpan = 50f + 25f * sin(rotation * 0.12f + idx).toFloat()
+        val rad2 = Math.toRadians((baseAngle + arcSpan).toDouble())
+        
+        val pStart = Offset(center.x + (cos(rad1) * r * 0.9f).toFloat(), center.y + (sin(rad1) * r * 0.9f).toFloat())
+        val pEnd = Offset(center.x + (cos(rad2) * r * 1.35f).toFloat(), center.y + (sin(rad2) * r * 1.35f).toFloat())
+        
+        // Zigzag midpoint
+        val midAngle = Math.toRadians((baseAngle + baseAngle + arcSpan) * 0.5)
+        val pMid = Offset(
+            center.x + (cos(midAngle) * r * 1.25f).toFloat() + 12f * sin(rotation * 0.4f).toFloat(),
+            center.y + (sin(midAngle) * r * 1.25f).toFloat() + 12f * cos(rotation * 0.4f).toFloat()
+        )
+        
+        val lightningPath = Path().apply {
+            moveTo(pStart.x, pStart.y)
+            lineTo(pMid.x, pMid.y)
+            lineTo(pEnd.x, pEnd.y)
+        }
+        
+        // Electric glow strokes
+        val glowColor = when (idx % 3) {
+            0 -> Color(0xFF00E5FF) // Cyber Cyan
+            1 -> Color(0xFFD500F9) // Electric Purple
+            else -> Color(0xFFFFEA00) // Golden Yellow
+        }
+        
+        drawPath(
+            path = lightningPath,
+            color = glowColor.copy(alpha = 0.75f),
+            style = Stroke(width = 3.5f.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Miter)
+        )
+        drawPath(
+            path = lightningPath,
+            color = Color.White,
+            style = Stroke(width = 1.2f.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Miter)
+        )
+    }
+
     // Sparkles and rays
     val numRays = 8
     rotate(-rotation * 0.5f, center) {
@@ -713,7 +814,7 @@ private fun DrawScope.drawDiscoBall(center: Offset, radius: Float, rotation: Flo
             val angle = i * (360f / numRays)
             val rad = Math.toRadians(angle.toDouble())
             val startRadius = r * 0.85f
-            val endRadius = r * (1.1f + 0.15f * sin(rotation * 0.1f + i).toFloat())
+            val endRadius = r * (1.15f + 0.18f * sin(rotation * 0.1f + i).toFloat())
             val startX = center.x + (cos(rad) * startRadius).toFloat()
             val startY = center.y + (sin(rad) * startRadius).toFloat()
             val endX = center.x + (cos(rad) * endRadius).toFloat()
@@ -746,23 +847,25 @@ private fun DrawScope.drawDiscoBall(center: Offset, radius: Float, rotation: Flo
 private fun DrawScope.drawSpinner(center: Offset, radius: Float, rotation: Float, unfoldProgress: Float = 1.0f) {
     val r = radius * 0.85f
     
-    // Outer circular motion blur path
+    // Outer circular motion blur path with high quality halo
     drawCircle(
-        color = Color(0x2200E5FF),
-        radius = r * 1.1f,
+        brush = Brush.sweepGradient(
+            colors = listOf(Color(0x0000E5FF), Color(0x6600E5FF), Color(0xAA00E5FF), Color(0x6600E5FF), Color(0x0000E5FF))
+        ),
+        radius = r * 1.15f,
         center = center,
-        style = Stroke(2.5f.dp.toPx())
+        style = Stroke(3.5f.dp.toPx())
     )
     
     rotate(rotation, center) {
-        // Draw 3 propeller wings (turbines)
+        // Draw 3 propeller wings (turbines) with beautiful volumetric shadows & bevels
         val numBlades = 3
         for (i in 0 until numBlades) {
             val angle = i * (360f / numBlades)
             val rad = Math.toRadians(angle.toDouble())
             
             val bladeLength = r * unfoldProgress
-            val bladeWidth = r * 0.35f
+            val bladeWidth = r * 0.38f
             
             val bladePath = Path().apply {
                 moveTo(center.x, center.y)
@@ -780,41 +883,58 @@ private fun DrawScope.drawSpinner(center: Offset, radius: Float, rotation: Float
             }
             
             val bladeColor = when (i) {
-                0 -> Brush.linearGradient(listOf(Color(0xFF00E5FF), Color(0xFF2979FF)))
-                1 -> Brush.linearGradient(listOf(Color(0xFFFFEA00), Color(0xFFFF9100)))
-                else -> Brush.linearGradient(listOf(Color(0xFFE040FB), Color(0xFF9013FE)))
+                0 -> Brush.radialGradient(listOf(Color(0xFF00E5FF), Color(0xFF2979FF), Color(0xFF0D47A1)), center = center, radius = bladeLength)
+                1 -> Brush.radialGradient(listOf(Color(0xFFFFEA00), Color(0xFFFF9100), Color(0xFFE65100)), center = center, radius = bladeLength)
+                else -> Brush.radialGradient(listOf(Color(0xFFE040FB), Color(0xFF9013FE), Color(0xFF4A148C)), center = center, radius = bladeLength)
+            }
+            
+            // Drop shadow for individual blades
+            translate(2f, 3f) {
+                drawPath(bladePath, Color.Black.copy(alpha = 0.35f))
             }
             
             drawPath(bladePath, bladeColor)
             
+            // Bevel stroke outline for metallic 3D sheen
+            drawPath(
+                path = bladePath,
+                color = Color.White.copy(alpha = 0.45f),
+                style = Stroke(width = 1.8f.dp.toPx())
+            )
+            
             // Shininess highlighted core line on blade
             drawLine(
-                color = Color.White.copy(alpha = 0.5f),
+                color = Color.White.copy(alpha = 0.7f),
                 start = center,
-                end = Offset(center.x + (cos(rad)*bladeLength*0.8f).toFloat(), center.y + (sin(rad)*bladeLength*0.8f).toFloat()),
-                strokeWidth = 1.5f.dp.toPx()
+                end = Offset(center.x + (cos(rad)*bladeLength*0.82f).toFloat(), center.y + (sin(rad)*bladeLength*0.82f).toFloat()),
+                strokeWidth = 2.5f.dp.toPx()
             )
         }
     }
     
-    // Polished golden central cap
+    // Polished golden central cap (thick 3D dome)
     drawCircle(
-        color = Color(0x44000000),
-        radius = r * 0.28f,
-        center = Offset(center.x + 1f, center.y + 2f)
+        color = Color(0x66000000),
+        radius = r * 0.35f,
+        center = Offset(center.x + 2f, center.y + 3f)
     )
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(Color(0xFFFFD54F), Color(0xFFF57F17)),
-            center = center,
-            radius = r * 0.25f
+            colors = listOf(Color(0xFFFFEA00), Color(0xFFFFB300), Color(0xFFFF6F00), Color(0xFF3E2723)),
+            center = Offset(center.x - r * 0.05f, center.y - r * 0.05f),
+            radius = r * 0.3f
         ),
-        radius = r * 0.25f
+        radius = r * 0.28f,
+        center = center
     )
     drawCircle(
-        color = Color.White.copy(alpha = 0.8f),
-        radius = r * 0.08f,
-        center = Offset(center.x - r * 0.07f, center.y - r * 0.07f)
+        brush = Brush.radialGradient(
+            colors = listOf(Color.White.copy(alpha = 0.85f), Color.Transparent),
+            center = Offset(center.x - r * 0.08f, center.y - r * 0.08f),
+            radius = r * 0.1f
+        ),
+        radius = r * 0.1f,
+        center = Offset(center.x - r * 0.08f, center.y - r * 0.08f)
     )
 }
 
@@ -826,10 +946,10 @@ private fun DrawScope.drawTNT(center: Offset, radius: Float) {
     
     // Shadow base
     drawRoundRect(
-        color = Color.Black.copy(alpha = 0.4f),
-        topLeft = Offset(center.x - w * 1.45f + 2f, center.y - h / 2f + 4f),
-        size = Size(w * 2.9f, h),
-        cornerRadius = CornerRadius(4.dp.toPx())
+        color = Color.Black.copy(alpha = 0.45f),
+        topLeft = Offset(center.x - w * 1.5f + 2f, center.y - h / 2f + 4f),
+        size = Size(w * 3.0f, h),
+        cornerRadius = CornerRadius(5.dp.toPx())
     )
     
     val leftOffset = -w * 0.88f
@@ -840,16 +960,36 @@ private fun DrawScope.drawTNT(center: Offset, radius: Float) {
     drawDynamiteStick(Offset(center.x + rightOffset, center.y), w, h)
     drawDynamiteStick(Offset(center.x, center.y), w, h)
     
-    // Binding black straps
-    drawRect(
-        color = Color(0xFF212121),
-        topLeft = Offset(center.x - w * 1.35f, center.y - h * 0.25f),
-        size = Size(w * 2.7f, h * 0.12f)
+    // Binding thick 3D golden buckle straps
+    drawRoundRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFFFFD54F), Color(0xFFF57F17), Color(0xFF3E2723))
+        ),
+        topLeft = Offset(center.x - w * 1.38f, center.y - h * 0.27f),
+        size = Size(w * 2.76f, h * 0.14f),
+        cornerRadius = CornerRadius(2.dp.toPx())
     )
-    drawRect(
-        color = Color(0xFF212121),
-        topLeft = Offset(center.x - w * 1.35f, center.y + h * 0.15f),
-        size = Size(w * 2.7f, h * 0.12f)
+    drawRoundRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFFFFD54F), Color(0xFFF57F17), Color(0xFF3E2723))
+        ),
+        topLeft = Offset(center.x - w * 1.38f, center.y + h * 0.13f),
+        size = Size(w * 2.76f, h * 0.14f),
+        cornerRadius = CornerRadius(2.dp.toPx())
+    )
+    
+    // High contrast reflection on both straps
+    drawLine(
+        color = Color.White.copy(alpha = 0.65f),
+        start = Offset(center.x - w * 0.8f, center.y - h * 0.27f),
+        end = Offset(center.x - w * 0.8f, center.y - h * 0.13f),
+        strokeWidth = 1.5f.dp.toPx()
+    )
+    drawLine(
+        color = Color.White.copy(alpha = 0.65f),
+        start = Offset(center.x - w * 0.8f, center.y + h * 0.13f),
+        end = Offset(center.x - w * 0.8f, center.y + h * 0.27f),
+        strokeWidth = 1.5f.dp.toPx()
     )
     
     // Fuse
@@ -864,57 +1004,65 @@ private fun DrawScope.drawTNT(center: Offset, radius: Float) {
     drawPath(
         path = fusePath,
         color = Color(0xFF5D4037),
-        style = Stroke(2.5f.dp.toPx(), cap = StrokeCap.Round)
+        style = Stroke(3.dp.toPx(), cap = StrokeCap.Round)
     )
     
-    // Burning fuse spark fire circle
-    val sparkRadius = 5.dp.toPx()
+    // Burning fuse spark fire circle with intensive radial burst
+    val sparkRadius = 6.dp.toPx()
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(Color.White, Color(0xFFFFD54F), Color(0xFFFF3D00), Color.Transparent),
+            colors = listOf(Color.White, Color(0xFFFFEB3B), Color(0xFFFF3D00), Color.Transparent),
             center = fuseEnd,
-            radius = sparkRadius * 2.5f
+            radius = sparkRadius * 2.8f
         ),
-        radius = sparkRadius * 2.5f,
+        radius = sparkRadius * 2.8f,
         center = fuseEnd
     )
     // Star crosses
-    drawLine(Color.White, Offset(fuseEnd.x - sparkRadius, fuseEnd.y), Offset(fuseEnd.x + sparkRadius, fuseEnd.y), strokeWidth = 1.5f.dp.toPx())
-    drawLine(Color.White, Offset(fuseEnd.x, fuseEnd.y - sparkRadius), Offset(fuseEnd.x, fuseEnd.y + sparkRadius), strokeWidth = 1.5f.dp.toPx())
+    drawLine(Color.White, Offset(fuseEnd.x - sparkRadius, fuseEnd.y), Offset(fuseEnd.x + sparkRadius, fuseEnd.y), strokeWidth = 2.dp.toPx())
+    drawLine(Color.White, Offset(fuseEnd.x, fuseEnd.y - sparkRadius), Offset(fuseEnd.x, fuseEnd.y + sparkRadius), strokeWidth = 2.dp.toPx())
 }
 
 private fun DrawScope.drawDynamiteStick(center: Offset, width: Float, height: Float) {
     val left = center.x - width / 2
     val top = center.y - height / 2
     
-    // Cylinder body
+    // Cylinder body with highly rounded 3D gradient look
     drawRoundRect(
         brush = Brush.linearGradient(
-            colors = listOf(Color(0xFFFF1744), Color(0xFF880E4F)),
+            colors = listOf(
+                Color(0xFFFF1744),
+                Color(0xFFFF5252),
+                Color(0xFFE60026),
+                Color(0xFF880E4F)
+            ),
             start = Offset(left, top),
             end = Offset(left + width, top)
         ),
         topLeft = Offset(left, top),
         size = Size(width, height),
-        cornerRadius = CornerRadius(2.5f.dp.toPx())
+        cornerRadius = CornerRadius(4.dp.toPx())
     )
     
-    val capHeight = height * 0.08f
+    val capHeight = height * 0.09f
     drawRoundRect(
-        color = Color(0xFF263238),
+        brush = Brush.horizontalGradient(
+            colors = listOf(Color(0xFF37474F), Color(0xFF212121), Color(0xFF455A64))
+        ),
         topLeft = Offset(left, top),
         size = Size(width, capHeight),
-        cornerRadius = CornerRadius(1.5f.dp.toPx())
+        cornerRadius = CornerRadius(2.dp.toPx())
     )
     
-    // Shiny specular side line
+    // Intense glossy 3D glass highlight line
     drawLine(
-        color = Color.White.copy(alpha = 0.35f),
-        start = Offset(left + width * 0.25f, top + capHeight),
-        end = Offset(left + width * 0.25f, top + height - capHeight),
-        strokeWidth = 1f.dp.toPx()
+        color = Color.White.copy(alpha = 0.55f),
+        start = Offset(left + width * 0.28f, top + capHeight),
+        end = Offset(left + width * 0.28f, top + height - capHeight),
+        strokeWidth = 1.5f.dp.toPx()
     )
 }
+
 
 // 10. Draw horizontal/vertical stripes (with bright glossy candy stripe highlights!)
 private fun DrawScope.drawStripedOverlay(center: Offset, radius: Float, isHorizontal: Boolean, rotation: Float) {

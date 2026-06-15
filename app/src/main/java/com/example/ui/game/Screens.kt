@@ -192,16 +192,31 @@ fun SplashScreen() {
     )
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF311B92), Color(0xFF1E102F), Color(0xFF0D0415))
-                )
-            ),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
+        // Real background image under the splash screen
+        Image(
+            painter = painterResource(id = R.drawable.img_game_background),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        // 3D glass overlay mask for contrast
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color(0xE01A0A3A), Color(0xF50D0420))
+                    )
+                )
+        )
         DecorativeBackgroundPattern()
+        
+        // Volumetric header light beam
+        DynamicLightingHeaderShader()
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
@@ -210,7 +225,7 @@ fun SplashScreen() {
             // High-end generated game logo
             Image(
                 painter = painterResource(id = R.drawable.img_app_icon),
-                contentDescription = "Royal Crush Logo",
+                contentDescription = "Candy Kingdom Legends Logo",
                 modifier = Modifier
                     .size(240.dp)
                     .scale(pulse)
@@ -222,20 +237,26 @@ fun SplashScreen() {
             Spacer(modifier = Modifier.height(32.dp))
 
             Text(
-                text = "ROYAL CRUSH",
+                text = "CANDY KINGDOM",
                 fontSize = 32.sp,
-                fontWeight = FontWeight.Black,
-                color = Color(0xFFFFD54F),
-                letterSpacing = 2.sp,
-                fontFamily = FontFamily.SansSerif
+                style = TextStyle(
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFFFFD54F),
+                    letterSpacing = 2.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    shadow = Shadow(color = Color.Black, offset = Offset(3f, 6f), blurRadius = 8f)
+                )
             )
             Text(
-                text = "P U Z Z L E",
+                text = "L E G E N D S",
                 fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                letterSpacing = 6.sp,
-                fontFamily = FontFamily.Monospace
+                style = TextStyle(
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    letterSpacing = 6.sp,
+                    fontFamily = FontFamily.Monospace,
+                    shadow = Shadow(color = Color(0xFFD500F9).copy(alpha = 0.8f), offset = Offset(0f, 0f), blurRadius = 12f)
+                )
             )
 
             Spacer(modifier = Modifier.height(48.dp))
@@ -286,15 +307,31 @@ fun HomeScreen(viewModel: GameViewModel, state: PlayerState) {
     val showBoosterShop by viewModel.showBoosterShop.collectAsState()
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF8E24AA), Color(0xFF311B92), Color(0xFF1E102F))
-                )
-            )
+        modifier = Modifier.fillMaxSize()
     ) {
+        // Full visual background image
+        Image(
+            painter = painterResource(id = R.drawable.img_game_background),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        // 3D Glass overlay mask for premium contrast
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(Color(0xD9100824), Color(0xF2100824)),
+                        center = Offset(500f, 600f),
+                        radius = 1800f
+                    )
+                )
+        )
         DecorativeBackgroundPattern()
+        
+        // Volumetric header light rays
+        DynamicLightingHeaderShader()
         // Decorative background sparkles/castles
         Column(
             modifier = Modifier
@@ -1198,15 +1235,31 @@ fun BoosterPurchaseColumn(
 @Composable
 fun WorldMapScreen(viewModel: GameViewModel, state: PlayerState) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF3e2723), Color(0xFF1A237E), Color(0xFF0D0415))
-                )
-            )
+        modifier = Modifier.fillMaxSize()
     ) {
+        // Full meadows background image
+        Image(
+            painter = painterResource(id = R.drawable.img_meadows_background),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        // 3D Glass overlay mask for premium contrast
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(Color(0xD9100824), Color(0xF2100824)),
+                        center = Offset(500f, 600f),
+                        radius = 1800f
+                    )
+                )
+        )
         DecorativeBackgroundPattern()
+        
+        // Dynamic top volumetric light rays
+        DynamicLightingHeaderShader()
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
             Row(
@@ -3659,14 +3712,15 @@ fun BadgeButton(
     content: @Composable RowScope.() -> Unit
 ) {
     var pressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.95f else 1f,
-        label = "badge_press_scale"
+    
+    // Smooth translation down when pressed to simulate mechanical compression
+    val pressTranslationY by animateDpAsState(
+        targetValue = if (pressed) 4.dp else 0.dp,
+        label = "badge_press_y"
     )
 
     Box(
         modifier = modifier
-            .scale(scale)
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 detectTapGestures(
@@ -3681,24 +3735,47 @@ fun BadgeButton(
                         }
                     }
                 )
-            }
-            .clip(RoundedCornerShape(16.dp)),
-        contentAlignment = Alignment.Center
+            },
+        contentAlignment = Alignment.TopCenter
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.badge),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.FillBounds
-        )
-        Row(
+        // 1. 3D Bevel solid base shadow block
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+                .matchParentSize()
+                .padding(top = 4.dp)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color(0xFFE65100), Color(0xFF9E0D00))
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+        )
+        
+        // 2. Active button face slab (moves down on press)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(y = pressTranslationY)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = if (enabled) {
+                            listOf(Color(0xFFFFA726), Color(0xFFF57C00))
+                        } else {
+                            listOf(Color(0xFFB0BEC5), Color(0xFF78909C))
+                        }
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .border(2.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
         ) {
-            content()
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                content()
+            }
         }
     }
 }
@@ -3763,14 +3840,29 @@ fun LoginRegisterScreen(viewModel: GameViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF200F21), Color(0xFF14071D), Color(0xFF09000D))
-                )
-            )
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
+        // Full visual background image
+        Image(
+            painter = painterResource(id = R.drawable.img_boss_background),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        // 3D Glass overlay mask
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color(0xE01F0D30), Color(0xF50C0315))
+                    )
+                )
+        )
+        
+        // Dynamic volumetric header lights
+        DynamicLightingHeaderShader()
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -5156,6 +5248,37 @@ fun DecorativeBackgroundPattern() {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun DynamicLightingHeaderShader() {
+    val infiniteTransition = rememberInfiniteTransition(label = "header_shader")
+    val pulseGlow by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
+    )
+    
+    Canvas(modifier = Modifier.fillMaxWidth().height(150.dp)) {
+        // Emit volumetric light cone from the center top
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFFFEA79).copy(alpha = 0.35f * pulseGlow),
+                    Color(0xFFE040FB).copy(alpha = 0.15f * pulseGlow),
+                    Color.Transparent
+                ),
+                center = Offset(size.width / 2f, 0f),
+                radius = size.width * 0.65f
+            ),
+            radius = size.width * 0.65f,
+            center = Offset(size.width / 2f, 0f)
+        )
     }
 }
 
