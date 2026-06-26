@@ -43,7 +43,7 @@ cd "$PANEL_DIR"
 
 echo "[5/9] Installing Node dependencies..."
 if command -v npm >/dev/null 2>&1; then
-    npm install
+    npm install --legacy-peer-deps
 else
     echo "npm is not installed!"
     exit 1
