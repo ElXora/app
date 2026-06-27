@@ -4,14 +4,14 @@ set -e
 
 PANEL_DIR="/var/www/pterodactyl"
 ZIP_URL="https://www.dropbox.com/scl/fi/lsnccgoufigcc9fonh7tn/archive.zip?rlkey=hyvpffbqk6ypz8r7jwjse3wa4&st=5v8wvh0o&e=1&dl=1"
-TMP_ZIP="/tmp/archive.zip"
+ZIP_FILE="/tmp/archive.zip"
 
-echo "========================================="
-echo "      Arix Theme Installer"
-echo "========================================="
+echo "======================================"
+echo "      Kroxy Theme Installer"
+echo "======================================"
 
 if [ "$EUID" -ne 0 ]; then
-    echo "Please run as root."
+    echo "Please run as root!"
     exit 1
 fi
 
@@ -20,55 +20,47 @@ if [ ! -d "$PANEL_DIR" ]; then
     exit 1
 fi
 
-echo "[1/9] Installing required packages..."
+echo "[1/8] Installing requirements..."
 apt update
-apt install -y unzip curl
+apt install -y curl unzip
 
-echo "[2/9] Downloading theme..."
-curl -L "$ZIP_URL" -o "$TMP_ZIP"
+echo "[2/8] Downloading theme..."
+curl -L "$ZIP_URL" -o "$ZIP_FILE"
 
-echo "[3/9] Creating backups..."
-cp -r "$PANEL_DIR/resources" "$PANEL_DIR/resources.backup" 2>/dev/null || true
-cp -r "$PANEL_DIR/public" "$PANEL_DIR/public.backup" 2>/dev/null || true
-cp -r "$PANEL_DIR/routes" "$PANEL_DIR/routes.backup" 2>/dev/null || true
-
-if [ -f "$PANEL_DIR/tailwind.config.js" ]; then
-    cp "$PANEL_DIR/tailwind.config.js" "$PANEL_DIR/tailwind.config.js.backup"
-fi
-
-echo "[4/9] Extracting theme..."
-unzip -o "$TMP_ZIP" -d "$PANEL_DIR"
-
+echo "[3/8] Creating backups..."
 cd "$PANEL_DIR"
 
-echo "[5/9] Installing Node dependencies..."
-if command -v npm >/dev/null 2>&1; then
-    npm install --legacy-peer-deps
-else
-    echo "npm is not installed!"
-    exit 1
-fi
+[ -d app ] && cp -r app app.backup
+[ -d database ] && cp -r database database.backup
+[ -d public ] && cp -r public public.backup
+[ -d resources ] && cp -r resources resources.backup
+[ -d routes ] && cp -r routes routes.backup
+[ -f tailwind.config.js ] && cp tailwind.config.js tailwind.config.js.backup
 
-echo "[6/9] Building panel..."
+echo "[4/8] Extracting theme..."
+unzip -o "$ZIP_FILE" -d "$PANEL_DIR"
+
+echo "[5/8] Installing dependencies..."
+npm install --legacy-peer-deps
+
+echo "[6/8] Building..."
 npm run build
 
-echo "[7/9] Clearing Laravel cache..."
+echo "[7/8] Clearing cache..."
 php artisan optimize:clear
 
-echo "[8/9] Restarting services..."
+echo "[8/8] Restarting services..."
 
-PHP_SERVICE=$(systemctl list-units --type=service --all | grep -oE 'php[0-9]+\.[0-9]+-fpm\.service' | head -n1)
+systemctl restart nginx
 
+PHP_SERVICE=$(systemctl list-units --type=service --all | awk '/php.*-fpm/ {print $1; exit}')
 if [ -n "$PHP_SERVICE" ]; then
     systemctl restart "$PHP_SERVICE"
 fi
 
-systemctl restart nginx
-
-echo "[9/9] Cleaning up..."
-rm -f "$TMP_ZIP"
+rm -f "$ZIP_FILE"
 
 echo ""
-echo "========================================="
+echo "======================================"
 echo " Theme installed successfully!"
-echo "========================================="
+echo "======================================"
